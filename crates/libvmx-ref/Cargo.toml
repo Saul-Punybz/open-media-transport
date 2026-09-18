@@ -1,0 +1,12 @@
+[package]
+name = "libvmx-ref"
+version = "0.0.0"
+description = "Test-only: builds the upstream libvmx C++ reference (128-bit path) for conformance tests. Never published."
+publish = false
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version = "1.77"
+
+[build-dependencies]
+cc = "1"

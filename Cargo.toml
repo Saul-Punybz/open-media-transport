@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["crates/vmx-codec", "crates/libvmx-ref"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Saul González", "Puny.bz Inc."]
+rust-version = "1.75"
+
+# The conformance tests push full-HD frames through the scalar codec.
+[profile.test]
+opt-level = 2

@@ -1,0 +1,18 @@
+[package]
+name = "vmx-codec"
+version = "0.1.0"
+description = "Pure-Rust port of VMX, the intra-frame video codec used by Open Media Transport (OMT)"
+readme = "README.md"
+# The conformance tests and benchmark need the unpublished libvmx-ref crate.
+exclude = ["tests/", "benches/", "examples/bench*"]
+keywords = ["video", "codec", "omt", "vmx", "broadcast"]
+categories = ["multimedia::video", "compression", "encoding"]
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+libvmx-ref = { path = "../libvmx-ref" }
