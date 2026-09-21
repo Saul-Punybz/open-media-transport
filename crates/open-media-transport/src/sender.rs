@@ -626,6 +626,10 @@ fn bind_dual_stack(port: u16) -> io::Result<TcpListener> {
     let v6 = (|| {
         let s = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP))?;
         s.set_only_v6(false)?;
+        // Lets a restarted sender take its port back while old connections
+        // sit in TIME_WAIT. Not on Windows, where it would allow stealing.
+        #[cfg(unix)]
+        s.set_reuse_address(true)?;
         s.bind(&SocketAddr::from(([0u16; 8], port)).into())?;
         s.listen(5)?;
         Ok::<_, io::Error>(s)
@@ -635,6 +639,8 @@ fn bind_dual_stack(port: u16) -> io::Result<TcpListener> {
         Err(e) if e.kind() == io::ErrorKind::AddrInUse => return Err(e),
         Err(_) => {
             let s = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+            #[cfg(unix)]
+            s.set_reuse_address(true)?;
             s.bind(&SocketAddr::from(([0u8; 4], port)).into())?;
             s.listen(5)?;
             s

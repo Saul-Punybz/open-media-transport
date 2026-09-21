@@ -1,0 +1,38 @@
+connecting to 127.0.0.1:6400
+connected Video
+connected Audio
+metadata Video sender-info xml="<OMTInfo ProductName=\x22omt-harness\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1\x22 />"
+metadata Video application xml="<HarnessHello Value=\x221\x22 />"
+metadata Video command Tally(Tally { preview: false, program: false }) xml="<OMTTally Preview=\x22false\x22 Program==\x22false\x22 />"
+metadata Video command Tally(Tally { preview: false, program: true }) xml="<OMTTally Preview=\x22false\x22 Program==\x22true\x22 />"
+metadata Audio sender-info xml="<OMTInfo ProductName=\x22omt-harness\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1\x22 />"
+metadata Audio application xml="<HarnessHello Value=\x221\x22 />"
+metadata Audio command Tally(Tally { preview: false, program: true }) xml="<OMTTally Preview=\x22false\x22 Program==\x22true\x22 />"
+pixels <HarnessFrame N=\x22120\x22 />\x00 fnv1a64=9bce0f7d66609e3a stride=1280
+psnr N=120 58.86 dB
+pixels <HarnessFrame N=\x22150\x22 />\x00 fnv1a64=143f961a4463856e stride=1280
+psnr N=150 58.41 dB
+closed Video Some(Io(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }))
+closed Audio Some(Io(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }))
+connected Video
+connected Audio
+metadata Video sender-info xml="<OMTInfo ProductName=\x22omt-harness\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1\x22 />"
+metadata Video application xml="<HarnessHello Value=\x221\x22 />"
+metadata Video command Tally(Tally { preview: false, program: false }) xml="<OMTTally Preview=\x22false\x22 Program==\x22false\x22 />"
+metadata Video command Tally(Tally { preview: false, program: true }) xml="<OMTTally Preview=\x22false\x22 Program==\x22true\x22 />"
+metadata Audio sender-info xml="<OMTInfo ProductName=\x22omt-harness\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1\x22 />"
+metadata Audio application xml="<HarnessHello Value=\x221\x22 />"
+metadata Audio command Tally(Tally { preview: false, program: true }) xml="<OMTTally Preview=\x22false\x22 Program==\x22true\x22 />"
+pixels <HarnessFrame N=\x2230\x22 />\x00 fnv1a64=00e5802921163351 stride=1280
+psnr N=30 58.44 dB
+pixels <HarnessFrame N=\x2260\x22 />\x00 fnv1a64=a1f8e5d8b0eaa6fc stride=1280
+psnr N=60 58.60 dB
+pixels <HarnessFrame N=\x2290\x22 />\x00 fnv1a64=0b76937c26495791 stride=1280
+psnr N=90 58.48 dB
+pixels <HarnessFrame N=\x22120\x22 />\x00 fnv1a64=9bce0f7d66609e3a stride=1280
+psnr N=120 58.86 dB
+pixels <HarnessFrame N=\x22150\x22 />\x00 fnv1a64=143f961a4463856e stride=1280
+psnr N=150 58.41 dB
+closed Video Some(Io(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }))
+closed Audio Some(Io(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }))
+done video=201 audio=201 ch0_rms=0.1769 ch1_silent=true

@@ -64,9 +64,14 @@ fn main() {
         };
         let (channel, f) = match event {
             Event::Frame(c, f) => (c, f),
+            Event::Connected(c) => {
+                println!("connected {c:?}");
+                continue;
+            }
             Event::Closed(c, why) => {
+                // The receiver reconnects on its own.
                 println!("closed {c:?} {why:?}");
-                break;
+                continue;
             }
         };
         match f.ext {
