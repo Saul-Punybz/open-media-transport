@@ -105,8 +105,8 @@ Failures are as useful as successes. If you can, a packet capture helps a lot:
 
 ## Known limitations
 
-- Only tested against libomtnet 1.0.0.19 on macOS; Windows and Linux builds are checked by
-  CI but have not been run against real products.
+- Only tested against libomtnet 1.0.0.19 on macOS. On Windows and Linux, CI builds it and
+  its own tests pass, but it has not been run against real products there.
 - `omt recv` saves snapshots of 8-bit video only; 10-bit (P216/PA16) streams are received
   but not saved.
 - Redirects and the OMT discovery server are not supported yet.

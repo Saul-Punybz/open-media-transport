@@ -59,7 +59,8 @@ excluded by kind and by name (`lo0`, `lo`).
 **Readiness (21 Sep 2026):** ready for *technical* testers who can build from source or run a
 downloaded binary from a terminal (`TESTING.md`). Not ready for end users: no GUI, unsigned
 binaries, only libomtnet-on-one-Mac verified. CI (`.github/workflows/ci.yml`) builds and
-tests on macOS, Linux and Windows. `release.yml` builds `omt` for four targets into a
+tests on macOS, Linux and Windows — green since `a6a23b9` (21 Sep 2026). That proves the
+code builds and its unit/loopback tests pass there, not that it interoperates there. `release.yml` builds `omt` for four targets into a
 **draft** GitHub release when a `v*` tag is pushed — no tag has been pushed; that is the
 maintainer's call.
 
