@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 21 Sep 2026 — starting the protocol port.
+**Last updated:** 21 Sep 2026 — stage 0 done (`docs/UPSTREAM.md`).
 
 ## RESUME HERE
 
@@ -24,8 +24,19 @@ the reference implementation's bytes proves the codec; it is not a live handshak
 (`crates/vmx-codec/BENCH.md`) — one core still does 1080p60 at OMT's default quality.
 Caudal does not speak OMT; that integration is Caudal's M12 and comes after this.
 
-**Next step:** `docs/PROTOCOL_PLAN.md`, stage 0. Do not write protocol code before
-stage 1's spec exists — every wire-format claim has to be traceable to upstream source.
+**Stage 0 is done:** `docs/UPSTREAM.md` inventories `libomtnet` at `029ef4e` (v1.0.0.19),
+cloned in `reference/libomtnet`, plus every other upstream repo. Two findings change the picture:
+
+1. Upstream has exactly one protocol implementation, `libomtnet`. The OBS plugin and both
+   Raspberry Pi devices are built on it, so they are not independent interop evidence;
+   vMix might be, but it is closed and its implementation is unknown.
+2. **A pure-Rust OMT crate already exists**: MikanseiLaboratory/openmediatransport-rs
+   (MIT, ~9K lines, listed in upstream's `DOWNLOADS.md`, not on crates.io, unverified).
+   Whether to build on it, contribute to it, use it as a cross-check or ignore it is
+   an open decision for the maintainer — settle it before stage 1.
+
+**Next step:** decide on the community crate, then `docs/PROTOCOL_PLAN.md` stage 1
+(`docs/PROTOCOL.md`, every claim citing upstream source `file:line`). Still no protocol code.
 
 ## House rules
 
