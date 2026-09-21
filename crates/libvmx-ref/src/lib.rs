@@ -103,6 +103,7 @@ pub enum RefFormat {
 }
 
 /// Safe owner of one `VMX_INSTANCE`.
+#[cfg_attr(libvmx_missing, allow(dead_code))]
 pub struct RefCodec {
     #[cfg(not(libvmx_missing))]
     inst: *mut ffi::VmxInstance,
@@ -276,9 +277,46 @@ impl Drop for RefCodec {
     }
 }
 
+// Without the upstream sources `new` returns `None`, so the methods below are
+// never reached; they exist so the tests and benchmark that use them still
+// compile (and then skip themselves), e.g. in CI.
 #[cfg(libvmx_missing)]
+#[allow(unused_variables, dead_code)]
 impl RefCodec {
     pub fn new(_w: usize, _h: usize, _p: i32, _t: i32, _s: bool) -> Option<Self> {
         None
+    }
+    pub fn set_quality(&mut self, q: i32) {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn quality(&mut self) -> i32 {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn encoding_parameters(&mut self) -> (i32, i32, i32, i32) {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn set_encoding_parameters(&mut self, frame_min: i32, frame_max: i32, min_q: i32, dc_shift: i32) {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn stride(&self, fmt: RefFormat) -> usize {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn frame_len(&self, fmt: RefFormat) -> usize {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn encode(&mut self, fmt: RefFormat, src: &[u8], interlaced: bool) -> Vec<u8> {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn encode_nv12(&mut self, y: &[u8], uv: &[u8]) -> Vec<u8> {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn encode_yv12(&mut self, y: &[u8], u: &[u8], v: &[u8]) -> Vec<u8> {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn decode(&mut self, data: &[u8], fmt: RefFormat) -> Result<Vec<u8>, i32> {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn decode_preview_uyvy(&mut self, data: &[u8]) -> Result<(Vec<u8>, usize, usize), i32> {
+        unreachable!("libvmx reference not built")
     }
 }
