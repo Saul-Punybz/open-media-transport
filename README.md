@@ -8,7 +8,21 @@ live video over a local network with low latency, the same job NDI does.
 |---|---|---|
 | [`vmx-codec`](crates/vmx-codec) | VMX, the OMT video codec. A safe-Rust port of [libvmx](https://github.com/openmediatransport/libvmx). | Codec core ported. Output is byte-identical to libvmx. |
 | [`open-media-transport`](crates/open-media-transport) | Protocol: discovery, sending and receiving, implemented from [`docs/PROTOCOL.md`](docs/PROTOCOL.md), a cited description of [libomtnet](https://github.com/openmediatransport/libomtnet). | Receiver, sender and discovery, working both ways against libomtnet on one Mac ([`docs/INTEROP.md`](docs/INTEROP.md)). Not yet tested with vMix or OBS. |
+| [`omt-cli`](crates/omt-cli) | The `omt` command: list, send a test pattern, receive and report. | For testers — see [`TESTING.md`](TESTING.md). |
 | `libvmx-ref` (unpublished) | Builds the upstream C++ libvmx, used only by the conformance tests and the benchmark. | Test-only. |
+
+## Try it
+
+```sh
+cargo build --release -p omt-cli
+./target/release/omt list                     # OMT sources on your network
+./target/release/omt send --name "Rust Test"  # a test pattern other OMT software can receive
+./target/release/omt recv "MY-PC (Camera 1)" --snapshot shot.bmp
+```
+
+[`TESTING.md`](TESTING.md) explains how to test against vMix, OBS and other OMT products,
+and what to report. Only libomtnet on one Mac has been tested so far
+([`docs/INTEROP.md`](docs/INTEROP.md)).
 
 ## Development
 

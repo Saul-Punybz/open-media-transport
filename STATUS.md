@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 21 Sep 2026 — receiver, sender and discovery all work against libomtnet (one Mac).
+**Last updated:** 21 Sep 2026 — `omt` CLI and TESTING.md: ready for outside testers (build from source).
 
 ## RESUME HERE
 
@@ -14,6 +14,7 @@ Public repo `Saul-Punybz/open-media-transport`, licensed MIT OR Apache-2.0.
 | Crate | What it is | State |
 |---|---|---|
 | `vmx-codec` | The OMT video codec, a safe-Rust port of `libvmx` | **Done.** Byte-identical to the C++ reference both ways, at any thread count. Conformance tests build upstream at `544bcfb`. |
+| `omt-cli` | The `omt` tool: `list`, `send` (test pattern), `recv` (stats + BMP snapshot) | Works against libomtnet here; for testers (`TESTING.md`). |
 | `libvmx-ref` | Builds the upstream C++ reference | Test-only. |
 | `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Receiver, sender, discovery.** Against libomtnet 1.0.0.19 on one Mac: we receive what it sends and it receives what we send, with identical decoded pixels both ways, each side finding the other by name (`docs/INTEROP.md`). Receiver reconnects. Deframer and command matching fuzzed (25 M runs, no failure). `Clock` generates and paces timestamps like libomtnet. No redirect or discovery server yet. 40 tests. |
 
@@ -55,12 +56,16 @@ not the OS host name — naming the OS host made `mdns-sd` conflict with macOS's
 and rename itself (`docs/evidence/2026-09-21-our-discovery`). Loopback interfaces are
 excluded by kind and by name (`lo0`, `lo`).
 
-**Next step:** evidence beyond libomtnet-on-one-Mac, which is now the limiting factor:
-1. A second machine on the LAN (another Mac, or a Linux box with Avahi), both directions.
-2. A real product: OBS with the OMT plugin, SIENNA's macOS OMT tools, or vMix's free tools
-   on a Windows PC. Needs the user to install or provide them.
-Code gaps meanwhile: re-resolving a source by name after it moves port; redirect (§9);
-the discovery server (§10); a public receive API that decodes (today the examples decode).
+**Readiness (21 Sep 2026):** ready for *technical* testers who can build from source or run a
+downloaded binary from a terminal (`TESTING.md`). Not ready for end users: no GUI, unsigned
+binaries, only libomtnet-on-one-Mac verified. CI (`.github/workflows/ci.yml`) builds and
+tests on macOS, Linux and Windows. `release.yml` builds `omt` for four targets into a
+**draft** GitHub release when a `v*` tag is pushed — no tag has been pushed; that is the
+maintainer's call.
+
+**Next step:** get reports from real products (`TESTING.md` §3) and record them in
+`docs/INTEROP.md`. Code gaps: redirect (§9), discovery server (§10), re-resolving a source
+by name after it moves port, 10-bit snapshots, a decoding receive API in the library.
 
 ## House rules
 

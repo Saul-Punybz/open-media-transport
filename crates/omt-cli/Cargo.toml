@@ -1,0 +1,19 @@
+[package]
+name = "omt-cli"
+version = "0.1.0"
+description = "Command-line tool to list, send and receive Open Media Transport (OMT) sources"
+readme = "README.md"
+keywords = ["video", "omt", "broadcast", "cli"]
+categories = ["multimedia::video", "command-line-utilities"]
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "omt"
+path = "src/main.rs"
+
+[dependencies]
+open-media-transport = { path = "../open-media-transport", version = "0.1" }
+vmx-codec = { path = "../vmx-codec", version = "0.1" }

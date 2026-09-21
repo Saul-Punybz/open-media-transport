@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      # reference/ (upstream C++ and C#) is not in the repository, so the
+      # libvmx conformance tests skip themselves here.
+      - run: cargo build --workspace --all-targets
+      - run: cargo test -p vmx-codec -p open-media-transport -p omt-cli
+      - run: cargo clippy -p open-media-transport -p omt-cli --all-targets -- -D warnings
+      - run: cargo fmt -p open-media-transport -p omt-cli --check

@@ -73,9 +73,11 @@ pub struct Source {
     pub host: String,
     /// TCP port of the sender.
     pub port: u16,
-    /// Addresses for `host`, best first: routable before link-local before
-    /// loopback, IPv4 before IPv6. macOS answers for its own host name with
-    /// loopback addresses too, which only work on the same machine.
+    /// Addresses for `host`, never empty, best first: routable before
+    /// link-local before loopback, IPv4 before IPv6. IPv6 link-local
+    /// addresses are left out, as libomtnet does (D10). macOS answers for its
+    /// own host name with loopback addresses too, which only work on the same
+    /// machine.
     pub addresses: Vec<IpAddr>,
 }
 
@@ -171,8 +173,20 @@ impl Browser {
                     if !is_valid_full_name(&full_name) {
                         continue;
                     }
-                    let mut addresses: Vec<IpAddr> =
-                        s.addresses.iter().map(|a| a.to_ip_addr()).collect();
+                    // IPv6 link-local addresses need an interface to be
+                    // usable and libomtnet ignores them (D10,
+                    // `OMTAddress.cs:98-101`); so do we. mdns-sd reports a
+                    // service as soon as it has any address, so an event may
+                    // carry none that is usable yet: wait for the next one.
+                    let mut addresses: Vec<IpAddr> = s
+                        .addresses
+                        .iter()
+                        .map(|a| a.to_ip_addr())
+                        .filter(|a| !is_ipv6_link_local(a))
+                        .collect();
+                    if addresses.is_empty() {
+                        continue;
+                    }
                     addresses.sort_by_key(address_preference);
                     SourceEvent::Resolved(Source {
                         full_name,
@@ -191,11 +205,14 @@ impl Browser {
     }
 }
 
+fn is_ipv6_link_local(a: &IpAddr) -> bool {
+    matches!(a, IpAddr::V6(v6) if (v6.segments()[0] & 0xffc0) == 0xfe80)
+}
+
 fn address_preference(a: &IpAddr) -> (u8, bool, IpAddr) {
     let class = match a {
         _ if a.is_loopback() => 2,
         IpAddr::V4(v4) if v4.is_link_local() => 1,
-        IpAddr::V6(v6) if (v6.segments()[0] & 0xffc0) == 0xfe80 => 1,
         _ => 0,
     };
     (class, a.is_ipv6(), *a)
@@ -302,19 +319,10 @@ mod tests {
         .iter()
         .map(|s| s.parse().unwrap())
         .collect();
+        a.retain(|x| !is_ipv6_link_local(x));
         a.sort_by_key(address_preference);
         let s: Vec<String> = a.iter().map(|x| x.to_string()).collect();
-        assert_eq!(
-            s,
-            [
-                "172.16.80.59",
-                "2001:db8::1",
-                "fe80::1",
-                "fe80::4a6:3a1c:277d:23f0",
-                "127.0.0.1",
-                "::1"
-            ]
-        );
+        assert_eq!(s, ["172.16.80.59", "2001:db8::1", "127.0.0.1", "::1"]);
     }
 
     #[test]

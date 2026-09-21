@@ -1,0 +1,42 @@
+name: Release
+
+# Builds the `omt` tool for each platform and attaches it to a GitHub release.
+# Runs only when a tag like v0.1.0 is pushed.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest, target: aarch64-apple-darwin, ext: "" }
+          - { os: macos-latest, target: x86_64-apple-darwin, ext: "" }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, ext: "" }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, ext: ".exe" }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo build --release -p omt-cli --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          name=omt-${{ github.ref_name }}-${{ matrix.target }}
+          mkdir "$name"
+          cp "target/${{ matrix.target }}/release/omt${{ matrix.ext }}" "$name/"
+          cp LICENSE-MIT LICENSE-APACHE NOTICE TESTING.md "$name/"
+          if [ "${{ matrix.ext }}" = ".exe" ]; then 7z a "$name.zip" "$name"; else tar czf "$name.tar.gz" "$name"; fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            omt-*.tar.gz
+            omt-*.zip
+          draft: true

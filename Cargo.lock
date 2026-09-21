@@ -115,6 +115,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "omt-cli"
+version = "0.1.0"
+dependencies = [
+ "open-media-transport",
+ "vmx-codec",
+]
+
+[[package]]
 name = "open-media-transport"
 version = "0.1.0"
 dependencies = [
