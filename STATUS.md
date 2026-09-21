@@ -1,0 +1,48 @@
+# STATUS — Open Media Transport in Rust
+
+**Last updated:** 21 Sep 2026 — starting the protocol port.
+
+## RESUME HERE
+
+**What this repo is.** A pure-Rust implementation of [Open Media Transport](https://www.openmediatransport.org/),
+the vMix team's MIT-licensed alternative to NDI for moving live video over a LAN.
+Public repo `Saul-Punybz/open-media-transport`, licensed MIT OR Apache-2.0.
+**All repo text is English.**
+
+**Where we are.**
+
+| Crate | What it is | State |
+|---|---|---|
+| `vmx-codec` | The OMT video codec, a safe-Rust port of `libvmx` | **Done.** Byte-identical to the C++ reference both ways, at any thread count. Conformance tests build upstream at `544bcfb`. |
+| `libvmx-ref` | Builds the upstream C++ reference | Test-only. |
+| `open-media-transport` | The protocol: discovery, sending, receiving. A port of `libomtnet` (C#, ~10.6K lines) | **Not started — this is the work.** |
+
+**What is NOT true yet, and must not be claimed:** nothing has ever talked to a real
+OMT device or application (not vMix, not OBS, not the Raspberry Pi encoder). Matching
+the reference implementation's bytes proves the codec; it is not a live handshake.
+`vmx-codec` has no SIMD, so it encodes 2.2x-3.2x slower than the C reference
+(`crates/vmx-codec/BENCH.md`) — one core still does 1080p60 at OMT's default quality.
+Caudal does not speak OMT; that integration is Caudal's M12 and comes after this.
+
+**Next step:** `docs/PROTOCOL_PLAN.md`, stage 0. Do not write protocol code before
+stage 1's spec exists — every wire-format claim has to be traceable to upstream source.
+
+## House rules
+
+- **Never invent protocol details.** Every statement about the wire format cites
+  upstream `file:line`. If upstream is ambiguous, say so in the spec and test it
+  against a real implementation rather than guessing.
+- **Verify with tools outside Claude**: `tshark` captures, real OMT applications,
+  the upstream C# implementation itself. Anything not externally verified is
+  reported as not verified.
+- **Reuse before writing**: check crates.io and GitHub first (mDNS, framing,
+  async IO). Only write what is genuinely missing, and verify what you take.
+- **Licensing**: MIT OR Apache-2.0. Ported code keeps the MIT notices of
+  `libomtnet` and `libvmx` and credits their authors — see `NOTICE`.
+  Never use OMT's or vMix's logos as branding; the crates may say what they implement.
+- **This laptop overheats.** One heavy job at a time, `CARGO_BUILD_JOBS=2`,
+  `nice -n 10`, never leave a process running. No endless loops, no full-workspace
+  builds while something else compiles.
+- **Commits**: clean messages, no `Co-Authored-By` and no `Claude-Session` lines.
+- **Save often**: update this file and push at the end of each batch of work,
+  not at the end of the project.
