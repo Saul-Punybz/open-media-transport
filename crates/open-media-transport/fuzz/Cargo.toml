@@ -1,0 +1,30 @@
+[package]
+name = "open-media-transport-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+open-media-transport = { path = ".." }
+
+# Kept out of the main workspace: needs nightly and libFuzzer.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "deframer"
+path = "fuzz_targets/deframer.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "metadata"
+path = "fuzz_targets/metadata.rs"
+test = false
+doc = false
+bench = false

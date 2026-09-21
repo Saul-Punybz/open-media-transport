@@ -68,8 +68,9 @@ nobody has yet: neither crate has ever been shown to talk to libomtnet, vMix or 
    TXT, two connections) — worth offering upstream as a documentation fix.
 4. **Correct identity on the network.** Real host names from the OS, all interfaces,
    and no loopback addresses advertised to the LAN — the defect shown above.
-5. **Fuzzed parsers.** Real `cargo fuzz` targets for the frame parser, the command
-   matcher and discovery-server XML, since every byte arrives from the network.
+5. **Fuzzed parsers.** Done for the frame parser and the command matcher:
+   `crates/open-media-transport/fuzz`, 10.0 M + 15.3 M runs without a failure, seeded
+   with bytes captured from libomtnet. Discovery-server XML will need one when it exists.
 6. **Publishable.** Codec and protocol as crates.io packages with no git
    dependencies, dual MIT/Apache licence, `#![forbid(unsafe_code)]` in the protocol
    crate as in `vmx-codec`.

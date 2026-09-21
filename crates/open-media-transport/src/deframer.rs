@@ -186,6 +186,57 @@ mod tests {
         ));
     }
 
+    /// A cheap stand-in for the fuzz targets that runs with `cargo test`:
+    /// valid frames, corrupted at random, fed in random chunks. The stream
+    /// must end in frames, `Ok(None)` or an error, never a panic, and every
+    /// frame returned must be self-consistent.
+    #[test]
+    fn corrupted_streams_never_panic() {
+        let mut seed = 0x9E37_79B9_7F4A_7C15u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for _ in 0..2000 {
+            let mut wire = Vec::new();
+            for i in 0..(next() % 4) {
+                match next() % 3 {
+                    0 => frame::write_metadata(0, Command::SubscribeVideo.as_bytes(), &mut wire),
+                    1 => frame::write(i as i64, &video(), &[1; 40], b"<m/>", &mut wire),
+                    _ => frame::write(i as i64, &ExtendedHeader::None, &[], &[], &mut wire),
+                }
+            }
+            for _ in 0..(next() % 4) {
+                if !wire.is_empty() {
+                    let at = (next() as usize) % wire.len();
+                    wire[at] = next() as u8;
+                }
+            }
+            let mut d = Deframer::new(Limits {
+                max_frame_len: 4096,
+            });
+            let chunk = (next() % 17 + 1) as usize;
+            'stream: for piece in wire.chunks(chunk) {
+                d.push(piece);
+                loop {
+                    match d.next_frame() {
+                        Ok(Some(f)) => {
+                            let ext = f.header.frame_type.extended_header_len();
+                            assert_eq!(
+                                HEADER_LEN + ext + f.data.len() + f.metadata.len(),
+                                f.header.frame_len().unwrap()
+                            );
+                        }
+                        Ok(None) => break,
+                        Err(_) => break 'stream,
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn bad_version_is_an_error_not_a_stall() {
         let mut wire = Vec::new();
