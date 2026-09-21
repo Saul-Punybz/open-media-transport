@@ -135,16 +135,28 @@ mod tests {
 
     #[test]
     fn stamps_and_paces() {
+        // What holds however loaded the machine is: stamps start at 0, are
+        // whole intervals, strictly increase, and are never handed out before
+        // wall time has reached them. (A late sleep makes the clock skip
+        // ahead, which a loaded CI runner does; see skips_ahead_when_late.)
         let mut c = Clock::new();
         let t0 = Instant::now();
-        let stamps: Vec<i64> = (0..6).map(|_| c.video(100, 1)).collect();
-        assert_eq!(stamps, [0, 100_000, 200_000, 300_000, 400_000, 500_000]);
-        // Five intervals of 10 ms were waited for.
-        assert!(
-            t0.elapsed() >= Duration::from_millis(45),
-            "{:?}",
-            t0.elapsed()
-        );
+        let mut last = -1;
+        for i in 0..6 {
+            let ts = c.video(20, 1); // 50 ms interval
+            if i == 0 {
+                assert_eq!(ts, 0);
+            }
+            assert_eq!(ts % 500_000, 0, "{ts}");
+            assert!(ts > last, "{ts} after {last}");
+            let elapsed_ticks = t0.elapsed().as_millis() as i64 * 10_000;
+            assert!(
+                elapsed_ticks >= ts,
+                "stamp {ts} handed out at {elapsed_ticks}"
+            );
+            last = ts;
+        }
+        assert!(last >= 2_500_000, "five intervals paced, got {last}");
     }
 
     #[test]
