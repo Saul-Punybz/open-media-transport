@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 21 Sep 2026 — spec written; crate started with the wire format.
+**Last updated:** 21 Sep 2026 — first captures of real libomtnet; spec partly confirmed.
 
 ## RESUME HERE
 
@@ -15,7 +15,7 @@ Public repo `Saul-Punybz/open-media-transport`, licensed MIT OR Apache-2.0.
 |---|---|---|
 | `vmx-codec` | The OMT video codec, a safe-Rust port of `libvmx` | **Done.** Byte-identical to the C++ reference both ways, at any thread count. Conformance tests build upstream at `544bcfb`. |
 | `libvmx-ref` | Builds the upstream C++ reference | Test-only. |
-| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Wire format only**: frame headers, commands, a size-limited deframer; 18 tests, all self-consistency. No networking yet. |
+| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Wire format only**: frame headers, commands, a size-limited deframer. 22 tests; 4 of them use bytes captured from real libomtnet, and our receiver handshake is byte-identical to its. No networking yet. |
 
 **What is NOT true yet, and must not be claimed:** nothing has ever talked to a real
 OMT device or application (not vMix, not OBS, not the Raspberry Pi encoder). Matching
@@ -36,8 +36,17 @@ Caudal does not speak OMT; that integration is Caudal's M12 and comes after this
   evidence, and on macOS it announces itself as `LOCALHOST` (shown with `dns-sd`,
   `docs/evidence/2026-09-21-community-crate-mdns/`).
 
-**Blocked on a tool:** confirming the spec needs libomtnet running here, which needs the
-.NET SDK (not installed). Alternatives: vMix/SIENNA free OMT tools, OBS + plugin, a Pi.
+**Verification tools now work here** (21 Sep 2026): .NET SDK 10.0.401 builds libomtnet
+through `interop/libomtnet-harness`; `tshark` can capture (wireshark-chmodbpf installed);
+`dns-sd` shows mDNS. First evidence: `docs/evidence/2026-09-21-libomtnet-loopback/` —
+libomtnet talking to itself confirmed 21 rows of `PROTOCOL.md` (marked [L]), including
+commands without NUL, two TCP connections per receiver, and the exact `OMTInfo` bytes.
+This is libomtnet against itself: **still nothing about vMix, OBS or a Pi.**
+
+Rebuild recipe (outputs to a scratch dir, never into the repo):
+`g++ -O3 -std=c++17 -fdeclspec -fPIC -Wno-c++11-narrowing -dynamiclib reference/libvmx/src/vmxcodec_arm.cpp reference/libvmx/src/vmxcodec.cpp -o $OUT/libvmx.dylib`
+then `dotnet build interop/libomtnet-harness -c Release -p:LibVmx=$OUT/libvmx.dylib -o $OUT/harness`.
+Use `tshark ... -a duration:N` — it ignores SIGALRM.
 
 **Next step:** discovery (stage 2): announce and browse `_omt._tcp` with a maintained
 mDNS crate (check `mdns-sd` first), using the real OS host name (`PROTOCOL.md` D3), with

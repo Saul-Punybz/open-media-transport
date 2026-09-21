@@ -11,10 +11,16 @@ code is quoted and the disagreement is flagged.
 - Upstream's own `reference/libomtnet/PROTOCOL.md` is cited as `PROTOCOL.md:line`
   and treated as secondary.
 
-**Nothing in this document has been confirmed against a running implementation.**
-The last column of every table, "Live", starts empty. It gets a date and a capture
-file only when a `tshark` capture of real `libomtnet`, vMix, OBS or a Pi shows the
-behaviour.
+The last column of every table, "Live", gets a date and a reference only when a
+capture of a running implementation shows the behaviour. Empty means not yet seen.
+
+- **[L]** — libomtnet talking to itself over loopback on macOS, captured with `tshark`
+  and `dns-sd`: [`evidence/2026-09-21-libomtnet-loopback`](evidence/2026-09-21-libomtnet-loopback/README.md).
+  This confirms what libomtnet does; it says nothing yet about vMix, OBS or a Pi.
+
+The header layouts in §3.1, §3.3 and §3.4 were also confirmed by [L]: our parser
+read every frame of both connections with no error. On macOS, D3 and D5 are
+confirmed; the Windows and Linux rows are not.
 
 ---
 
@@ -23,10 +29,10 @@ behaviour.
 | # | Statement | Source | Live |
 |---|---|---|---|
 | T1 | Plain TCP. A sender listens on a dual-stack IPv6 socket (`IPv6Only = false`), backlog 5. | `OMTSend.cs:97,107-109` | |
-| T2 | The sender takes the first free port from 6400 to 6600 inclusive. The range can be overridden with `NetworkPortStart`/`NetworkPortEnd` in `settings.xml`. | `OMTSend.cs:99-119`, `OMTConstants.cs:64-65` | |
+| T2 | The sender takes the first free port from 6400 to 6600 inclusive. The range can be overridden with `NetworkPortStart`/`NetworkPortEnd` in `settings.xml`. | `OMTSend.cs:99-119`, `OMTConstants.cs:64-65` |  2026-09-21 [L] |
 | T3 | Both ends set `TCP_NODELAY`, and try to enable SO_KEEPALIVE with idle time 5 (the option is set with raw number 3 and the value 5; the unit is platform-translated by .NET and not stated). | `OMTChannel.cs:75,88-89` | |
 | T4 | Socket buffers: send 64 KiB; receive 8 MiB on video/audio connections, 64 KiB on metadata-only ones. | `OMTChannel.cs:76-83`, `OMTConstants.cs:38-40` | |
-| T5 | **A receiver opens two TCP connections to the same port**: one for video + metadata and one for audio. Only the connections for the requested frame types are opened. A metadata-only receiver opens one. | `OMTReceive.cs:363-377`, and the sender's own comment at `OMTSend.cs:340` | |
+| T5 | **A receiver opens two TCP connections to the same port**: one for video + metadata and one for audio. Only the connections for the requested frame types are opened. A metadata-only receiver opens one. | `OMTReceive.cs:363-377`, and the sender's own comment at `OMTSend.cs:340` |  2026-09-21 [L] |
 | T6 | The sender does not know in advance what a connection is for. Every accepted connection is created as a metadata channel. What it carries is decided by the subscribe commands it later receives (§4.1). | `OMTSend.cs:364`, `OMTChannel.cs:195-198,327-339` | |
 
 `PROTOCOL.md` does not mention T5. A receiver that opens one connection and
@@ -107,12 +113,12 @@ the truth.
 
 | # | Statement | Source | Live |
 |---|---|---|---|
-| M1 | `FrameType` 1, no extended header, `MetadataLength` 0, data = UTF-8 XML. | `OMTChannel.cs:161-167`, `OMTBuffer.cs:109-113` | |
-| M2 | **Protocol commands are sent without a terminating NUL.** They are built from string constants and encoded with `UTF8.GetBytes`, which adds nothing. | `OMTMetadata.cs:38-58`, `OMTBuffer.cs:109-113`, e.g. `OMTReceive.cs:420` | |
+| M1 | `FrameType` 1, no extended header, `MetadataLength` 0, data = UTF-8 XML. | `OMTChannel.cs:161-167`, `OMTBuffer.cs:109-113` |  2026-09-21 [L] |
+| M2 | **Protocol commands are sent without a terminating NUL.** They are built from string constants and encoded with `UTF8.GetBytes`, which adds nothing. | `OMTMetadata.cs:38-58`, `OMTBuffer.cs:109-113`, e.g. `OMTReceive.cs:420` |  2026-09-21 [L] |
 | M3 | **Commands are recognised by exact string equality** on the whole payload decoded as UTF-8. A command that arrives with a trailing NUL, extra whitespace or different attribute order is not a command; it is passed to the application as ordinary metadata. | `OMTBuffer.cs:115-118`, `OMTChannel.cs:326-363` | |
-| M4 | Application metadata keeps whatever length the application gave. Applications are told to include the NUL (`OMTPublicTypes.cs:357,367`), and `IntPtrToXML` decodes all `length` bytes, so that NUL travels on the wire. | `OMTUtils.cs:148-158`, `OMTMetadata.cs:126-134` | |
-| M5 | Metadata timestamps: protocol commands use 0. | `OMTReceive.cs:420-448`, `OMTMetadata.cs:106-124` | |
-| M6 | Metadata frames are sent on a connection regardless of subscriptions. Video and audio frames are sent only if that connection subscribed to them. | `OMTChannel.cs:195-198` | |
+| M4 | Application metadata keeps whatever length the application gave. Applications are told to include the NUL (`OMTPublicTypes.cs:357,367`), and `IntPtrToXML` decodes all `length` bytes, so that NUL travels on the wire. | `OMTUtils.cs:148-158`, `OMTMetadata.cs:126-134` |  2026-09-21 [L] |
+| M5 | Metadata timestamps: protocol commands use 0. | `OMTReceive.cs:420-448`, `OMTMetadata.cs:106-124` |  2026-09-21 [L] |
+| M6 | Metadata frames are sent on a connection regardless of subscriptions. Video and audio frames are sent only if that connection subscribed to them. | `OMTChannel.cs:195-198` |  2026-09-21 [L] |
 
 **Conflict with upstream docs.** `PROTOCOL.md:82-84` says metadata is
 "null terminated" and "DataLength should always include the null character". The
@@ -140,12 +146,12 @@ precedes `/>`.
 
 | Command | Bytes | Effect on the sender | Source | Live |
 |---|---|---|---|---|
-| Subscribe video | `<OMTSubscribe Video="true" />` | this connection receives video | `OMTMetadata.cs:38`, `OMTChannel.cs:327-331` | |
-| Subscribe audio | `<OMTSubscribe Audio="true" />` | this connection receives audio | `OMTMetadata.cs:39`, `OMTChannel.cs:332-335` | |
-| Subscribe metadata | `<OMTSubscribe Metadata="true" />` | this connection receives application metadata broadcasts | `OMTMetadata.cs:40`, `OMTChannel.cs:336-339`, `OMTSend.cs:649` | |
+| Subscribe video | `<OMTSubscribe Video="true" />` | this connection receives video | `OMTMetadata.cs:38`, `OMTChannel.cs:327-331` |  2026-09-21 [L] |
+| Subscribe audio | `<OMTSubscribe Audio="true" />` | this connection receives audio | `OMTMetadata.cs:39`, `OMTChannel.cs:332-335` |  2026-09-21 [L] |
+| Subscribe metadata | `<OMTSubscribe Metadata="true" />` | this connection receives application metadata broadcasts | `OMTMetadata.cs:40`, `OMTChannel.cs:336-339`, `OMTSend.cs:649` |  2026-09-21 [L] |
 | Preview on / off | `<OMTSettings Preview="true" />` / `<OMTSettings Preview="false" />` | video on this connection switches to preview (§6.2) | `OMTMetadata.cs:41-42`, `OMTChannel.cs:356-363` | |
-| Tally | `<OMTTally Preview="…" Program=="…" />`, four fixed strings | sets this connection's tally | `OMTMetadata.cs:45-48`, `OMTChannel.cs:340-355` | |
-| Suggested quality | `<OMTSettings Quality="X" />`, X ∈ `Default`, `Low`, `Medium`, `High` | sets this connection's suggestion | `OMTMetadata.cs:52-53`, `OMTReceive.cs:1047-1057`, `OMTChannel.cs:364-389` | |
+| Tally | `<OMTTally Preview="…" Program=="…" />`, four fixed strings | sets this connection's tally | `OMTMetadata.cs:45-48`, `OMTChannel.cs:340-355` |  2026-09-21 [L] |
+| Suggested quality | `<OMTSettings Quality="X" />`, X ∈ `Default`, `Low`, `Medium`, `High` | sets this connection's suggestion | `OMTMetadata.cs:52-53`, `OMTReceive.cs:1047-1057`, `OMTChannel.cs:364-389` |  2026-09-21 [L] |
 
 - There is no unsubscribe. Subscriptions only ever add bits: `OMTChannel.cs:329,334,338`.
 - Tally strings contain `Program==` with **two** equals signs. They are not
@@ -160,9 +166,9 @@ precedes `/>`.
 
 | Message | Bytes | When | Source | Live |
 |---|---|---|---|---|
-| Sender info | `<OMTInfo ProductName="…" Manufacturer="…" Version="…" />` | on connect, if set; and broadcast when set | `OMTPublicTypes.cs:238-250`, `OMTSend.cs:366-369,167-177` | |
-| Connection metadata | application-defined strings | on connect | `OMTSend.cs:370,192-204` | |
-| Tally | the same four strings as §4.1 | on connect (combined tally), then on every change | `OMTSend.cs:371,464-467` | |
+| Sender info | `<OMTInfo ProductName="…" Manufacturer="…" Version="…" />` | on connect, if set; and broadcast when set | `OMTPublicTypes.cs:238-250`, `OMTSend.cs:366-369,167-177` |  2026-09-21 [L] |
+| Connection metadata | application-defined strings | on connect | `OMTSend.cs:370,192-204` |  2026-09-21 [L] |
+| Tally | the same four strings as §4.1 | on connect (combined tally), then on every change | `OMTSend.cs:371,464-467` |  2026-09-21 [L] |
 | Redirect | `<OMTRedirect NewAddress="…" />` | on connect if a redirect is active, and when it changes | `OMTRedirect.cs:59-63,50-57,181-194` | |
 
 - The combined tally is the OR of every connection's preview and program bits:
@@ -171,12 +177,12 @@ precedes `/>`.
   application: `OMTChannel.cs:390-393`.
 - Redirect is matched by prefix `<OMTRedirect`; the attribute read is `NewAddress`:
   `OMTChannel.cs:394-398`, `OMTRedirect.cs:165-180`.
-- **Unclear, exact bytes.** Sender info and redirect are produced by .NET's
-  `XmlTextWriter` with `Formatting.Indented` (`OMTPublicTypes.cs:240-249`,
-  `OMTRedirect.cs:185-191`). A single element with attributes should serialise on one
-  line as `<OMTInfo … />`, but the exact spacing and escaping has to come from a
-  capture, not from memory. Receivers parse these as XML, so exact bytes matter only
-  if we want byte-identical output.
+- **Exact bytes.** Sender info and redirect are produced by .NET's `XmlTextWriter`
+  with `Formatting.Indented` (`OMTPublicTypes.cs:240-249`, `OMTRedirect.cs:185-191`).
+  Sender info was captured [L] as one line, attributes in order, one space before `/>`,
+  no NUL: `<OMTInfo ProductName="omt-harness" Manufacturer="open-media-transport" Version="0.1" />`.
+  Escaping of special characters and the redirect bytes are still unseen. Receivers
+  parse these as XML, so exact bytes matter only for byte-identical output.
 
 ### 4.3 Connection sequences
 
@@ -206,7 +212,7 @@ arrives: sender info (if set), each connection-metadata string, tally, redirect
 | # | Statement | Source | Live |
 |---|---|---|---|
 | C1 | Units are 100 ns. The application is expected to supply capture time. | `OMTPublicTypes.cs:286-297` | |
-| C2 | Timestamp −1 asks the sender to generate timestamps. The first frame gets 0. Later frames get previous + interval, where interval is `10^7 / fps` for video or `10^7 × samples / rate` for audio. | `OMTClock.cs:58-70,90-99` | |
+| C2 | Timestamp −1 asks the sender to generate timestamps. The first frame gets 0. Later frames get previous + interval, where interval is `10^7 / fps` for video or `10^7 × samples / rate` for audio. | `OMTClock.cs:58-70,90-99` |  2026-09-21 [L] |
 | C3 | In that mode the sender also **paces**: it sleeps until wall-clock catches up, and skips timestamps forward if it has fallen more than one interval behind. | `OMTClock.cs:72-83` | |
 | C4 | The clock resets when frame rate or sample rate changes. | `OMTClock.cs:51-57` | |
 
@@ -255,7 +261,7 @@ whether to reproduce or fix it.
 | # | Statement | Source | Live |
 |---|---|---|---|
 | A1 | 32-bit float samples, planar: all samples of channel 0, then channel 1, … | `OMTPublicTypes.cs:344-355` | |
-| A2 | Channels whose samples are all zero bytes are left out of the data and their bit is cleared in `ActiveChannels`. | `codecs/OMTFPA1Codec.cs:68-86` | |
+| A2 | Channels whose samples are all zero bytes are left out of the data and their bit is cleared in `ActiveChannels`. | `codecs/OMTFPA1Codec.cs:68-86` |  2026-09-21 [L] |
 | A3 | The receiver re-inserts silent channels as zeros, so it always outputs `Channels` planes. | `codecs/OMTFPA1Codec.cs:39-59` | |
 | A4 | Receivers reject `SamplesPerChannel × Channels × 4 > 1 MiB`. | `OMTReceive.cs:1082-1113` | |
 
@@ -270,11 +276,11 @@ wire value for channel 32 is bit 31.
 
 | # | Statement | Source | Live |
 |---|---|---|---|
-| D1 | Service type `_omt._tcp`, domain `local`. | `mac/OMTDiscoveryDnsSd.cs:190,267`, `win32/OMTDiscoveryWin32.cs:142,201`, `mdns/MDNSClient.cs` via `win32/OMTDiscoveryWin32.cs:122` | |
-| D2 | Instance name is the source's full name, `MACHINE (Name)`. | `OMTAddress.cs:196-204`, `mac/OMTDiscoveryDnsSd.cs:262-270`, `linux/OMTDiscoveryAvahi.cs:193-195` | |
-| D3 | `MACHINE` is the host name **upper-cased**: `gethostname()` on macOS and Linux, `ComputerNamePhysicalDnsHostname` on Windows. | `mac/MacPlatform.cs:51-73`, `linux/LinuxPlatform.cs:43-65`, `win32/Win32Platform.cs:59-69` | |
+| D1 | Service type `_omt._tcp`, domain `local`. | `mac/OMTDiscoveryDnsSd.cs:190,267`, `win32/OMTDiscoveryWin32.cs:142,201`, `mdns/MDNSClient.cs` via `win32/OMTDiscoveryWin32.cs:122` |  2026-09-21 [L] |
+| D2 | Instance name is the source's full name, `MACHINE (Name)`. | `OMTAddress.cs:196-204`, `mac/OMTDiscoveryDnsSd.cs:262-270`, `linux/OMTDiscoveryAvahi.cs:193-195` |  2026-09-21 [L] |
+| D3 | `MACHINE` is the host name **upper-cased**: `gethostname()` on macOS and Linux, `ComputerNamePhysicalDnsHostname` on Windows. | `mac/MacPlatform.cs:51-73`, `linux/LinuxPlatform.cs:43-65`, `win32/Win32Platform.cs:59-69` |  2026-09-21 [L] |
 | D4 | The full name is cut to 63 characters by shortening `Name`. | `OMTAddress.cs:40,65-75` | |
-| D5 | **No TXT data.** macOS passes `txtLen = 0`; Linux passes a null TXT list; Windows sets `dwPropertyCount = 0`. `CreateTXTRecord` exists on macOS but is never called. | `mac/OMTDiscoveryDnsSd.cs:270` (and `:248-253` unused), `linux/OMTDiscoveryAvahi.cs:195`, `win32/OMTDiscoveryWin32.cs:198` | |
+| D5 | **No TXT data.** macOS passes `txtLen = 0`; Linux passes a null TXT list; Windows sets `dwPropertyCount = 0`. `CreateTXTRecord` exists on macOS but is never called. | `mac/OMTDiscoveryDnsSd.cs:270` (and `:248-253` unused), `linux/OMTDiscoveryAvahi.cs:195`, `win32/OMTDiscoveryWin32.cs:198` |  2026-09-21 [L] |
 | D6 | Windows removes every `.` from the instance name before registering, and advertises host `MACHINE.local`. | `win32/OMTDiscoveryWin32.cs:201-202` | |
 | D7 | A browser accepts an instance only if its name contains `(` and `)`. | `OMTAddress.cs:206-219`, `mac/OMTDiscoveryDnsSd.cs:369`, `linux/OMTDiscoveryAvahi.cs:270` | |
 | D8 | Windows additionally multicasts its own PTR query for `_omt._tcp.local` every 8 s to 224.0.0.251 and ff02::fb port 5353, on every non-loopback multicast interface, because the Windows API stops querying. It is a QM query (class IN, no unicast-response bit). | `mdns/MDNSClient.cs:37-62,76-124` | |
@@ -362,8 +368,8 @@ Yes, for the first milestone: browse `_omt._tcp` (§7), connect (§1), send the 
 connection sequence (§4.3), parse frames (§3), decode VMX1 (§6.1) with `vmx-codec`.
 Open items that a capture must settle before calling it done:
 
-1. M2/M3: commands without NUL.
-2. T5: whether one connection for video and audio also works.
-3. Exact `<OMTInfo>` and `<OMTRedirect>` bytes.
+1. ~~M2~~ confirmed [L]; M3 (a NUL-terminated command is ignored) still to test.
+2. T5 (two connections) confirmed [L]; whether one connection for both also works is untested.
+3. ~~`<OMTInfo>` bytes~~ confirmed [L]; `<OMTRedirect>` bytes still unseen.
 4. U2: preview + per-frame metadata.
 5. D3/D6: the instance names real senders on macOS and Windows actually publish.

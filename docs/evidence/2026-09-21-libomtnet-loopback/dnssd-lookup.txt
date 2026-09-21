@@ -1,0 +1,5 @@
+Lookup SAULS-MACBOOK-PRO.LOCAL (Cam 1.5)._omt._tcp.local
+DATE: ---Mon 21 Sep 2026---
+13:03:30.871  ...STARTING...
+13:03:30.871  SAULS-MACBOOK-PRO\.LOCAL\032(Cam\0321\.5)._omt._tcp.local. can be reached at Sauls-MacBook-Pro.local.:6400 (interface 14) Flags: 1
+13:03:30.871  SAULS-MACBOOK-PRO\.LOCAL\032(Cam\0321\.5)._omt._tcp.local. can be reached at Sauls-MacBook-Pro.local.:6400 (interface 14)

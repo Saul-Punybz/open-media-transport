@@ -44,16 +44,19 @@ Each row cites our spec. "Verified" means observed with a tool outside Claude.
 | Preview + per-frame metadata (U2) | metadata bytes replaced by VMX bytes (suspected bug) | appends the real metadata after the preview prefix | theirs is arguably correct; bytes differ from upstream | no |
 | Opaque BGRA (V4) | `VMX_EncodeBGRA` | `encode_bgrx` | different bitstream; should decode the same | no |
 | Preview off | sends nothing unless preview is wanted | always sends `<OMTSettings Preview="false" />` | harmless if upstream behaves as read | no |
-| Commands without NUL (M2) | no NUL | no NUL | agree | no — both are readings of the same code |
-| Two connections per receiver (T5) | yes | yes (AV stream + separate audio stream) | agree | no |
+| Commands without NUL (M2) | no NUL | no NUL | agree | libomtnet side **yes** ([L](evidence/2026-09-21-libomtnet-loopback/README.md)); theirs not captured |
+| Two connections per receiver (T5) | yes | yes (AV stream + separate audio stream) | agree | libomtnet side **yes** ([L](evidence/2026-09-21-libomtnet-loopback/README.md)); theirs not captured |
 
 ## What would make this crate worth having next to theirs
 
 Ranked by how much each strengthens trust in the result, which is the one thing
 nobody has yet: neither crate has ever been shown to talk to libomtnet, vMix or OBS.
 
-1. **Interop evidence, kept in the repo.** `tshark` captures and a written matrix
-   (`INTEROP.md`, stage 5) against libomtnet itself, OBS with the OMT plugin, vMix's
+1. **Interop evidence, kept in the repo.** Started: libomtnet against itself is
+   captured in `evidence/2026-09-21-libomtnet-loopback`, and our receiver handshake
+   is byte-identical to libomtnet's (`crates/open-media-transport/tests/captured.rs`).
+   Still to come: `tshark` captures and a written matrix (`INTEROP.md`, stage 5) of
+   our code against libomtnet, OBS with the OMT plugin, vMix's
    free OMT tools, SIENNA's macOS tools, and a Pi. This is the single largest gap in
    the community crate and the thing the README can point to.
 2. **A conformance harness against real upstream code.** The same idea that made
