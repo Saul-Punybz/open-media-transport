@@ -11,7 +11,7 @@
 
 use std::time::{Duration, Instant};
 
-use open_media_transport::frame::TICKS_PER_SECOND;
+use open_media_transport::clock::Clock;
 use open_media_transport::sender::{Sender, SenderConfig, SenderInfo, VideoParams};
 use vmx_codec::{Frame, PixelFormat};
 
@@ -49,17 +49,14 @@ fn main() {
     let samples = RATE / FPS as usize;
     let mut frame = Frame::new(W, H, PixelFormat::Uyvy);
     let mut audio = vec![0.0f32; samples * 2];
-    let interval = TICKS_PER_SECOND / FPS; // 333333, as libomtnet's clock (C2)
-    let start = Instant::now();
+    // One clock per stream, like libomtnet's timestamp -1 mode (C2, C3).
+    let (mut video_clock, mut audio_clock) = (Clock::new(), Clock::new());
+    let end = Instant::now() + Duration::from_secs(seconds);
     let mut last_tally = tx.tally();
 
     for n in 0.. {
-        let due = start + Duration::from_nanos(n as u64 * 1_000_000_000 / FPS as u64);
-        if due > start + Duration::from_secs(seconds) {
+        if Instant::now() >= end {
             break;
-        }
-        if let Some(wait) = due.checked_duration_since(Instant::now()) {
-            std::thread::sleep(wait);
         }
         fill_pattern(&mut frame.planes[0].data, n);
         let meta = if n % 30 == 0 {
@@ -67,13 +64,14 @@ fn main() {
         } else {
             Vec::new()
         };
-        let ts = n as i64 * interval;
+        let ts = video_clock.video(FPS as i32, 1);
         tx.send_video(&frame, params, ts, &meta).expect("encode");
 
         for (i, s) in audio[..samples].iter_mut().enumerate() {
             let t = (n * samples + i) as f64 / RATE as f64;
             *s = ((2.0 * std::f64::consts::PI * 1000.0 * t).sin() * 0.25) as f32;
         }
+        let ts = audio_clock.audio(RATE as i32, samples as i32);
         tx.send_audio(&audio, 2, RATE as i32, ts, b"");
 
         let t = tx.tally();

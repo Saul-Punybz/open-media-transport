@@ -217,6 +217,7 @@ arrives: sender info (if set), each connection-metadata string, tally, redirect
 | C2 | Timestamp −1 asks the sender to generate timestamps. The first frame gets 0. Later frames get previous + interval, where interval is `10^7 / fps` for video or `10^7 × samples / rate` for audio. | `OMTClock.cs:58-70,90-99` |  2026-09-21 [L] |
 | C3 | In that mode the sender also **paces**: it sleeps until wall-clock catches up, and skips timestamps forward if it has fallen more than one interval behind. | `OMTClock.cs:72-83` | |
 | C4 | The clock resets when frame rate or sample rate changes. | `OMTClock.cs:51-57` | |
+| C5 | The video interval uses the frame rate rounded to two decimals as a `float`: `(long)(10^7 / Round(n/d, 2))`, so 30000/1001 gives 333667 ticks, not 333666. Wall time is read in whole milliseconds. | `OMTUtils.cs:168-174`, `OMTClock.cs:73,79,96-99` | |
 
 Video and audio clocks are independent (`OMTSend.cs:85-86`); nothing in the code
 aligns them. Audio/video sync is therefore up to the timestamps the application

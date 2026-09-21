@@ -15,7 +15,7 @@ Public repo `Saul-Punybz/open-media-transport`, licensed MIT OR Apache-2.0.
 |---|---|---|
 | `vmx-codec` | The OMT video codec, a safe-Rust port of `libvmx` | **Done.** Byte-identical to the C++ reference both ways, at any thread count. Conformance tests build upstream at `544bcfb`. |
 | `libvmx-ref` | Builds the upstream C++ reference | Test-only. |
-| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Receiver, sender, discovery.** Against libomtnet 1.0.0.19 on one Mac: we receive what it sends and it receives what we send, with identical decoded pixels both ways, each side finding the other by name (`docs/INTEROP.md`). Receiver reconnects. Deframer and command matching fuzzed (25 M runs, no failure). No redirect or discovery server yet. 36 tests. |
+| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Receiver, sender, discovery.** Against libomtnet 1.0.0.19 on one Mac: we receive what it sends and it receives what we send, with identical decoded pixels both ways, each side finding the other by name (`docs/INTEROP.md`). Receiver reconnects. Deframer and command matching fuzzed (25 M runs, no failure). `Clock` generates and paces timestamps like libomtnet. No redirect or discovery server yet. 40 tests. |
 
 **What is NOT true yet, and must not be claimed:** nothing has talked to vMix, OBS or
 the Raspberry Pi devices. Our receiver, sender and discovery have talked to libomtnet itself,
@@ -59,8 +59,8 @@ excluded by kind and by name (`lo0`, `lo`).
 1. A second machine on the LAN (another Mac, or a Linux box with Avahi), both directions.
 2. A real product: OBS with the OMT plugin, SIENNA's macOS OMT tools, or vMix's free tools
    on a Windows PC. Needs the user to install or provide them.
-Code gaps meanwhile: re-resolving a source by name after it moves port, timestamp
-generation/pacing (C2, C3) in the sender.
+Code gaps meanwhile: re-resolving a source by name after it moves port; redirect (§9);
+the discovery server (§10); a public receive API that decodes (today the examples decode).
 
 ## House rules
 
