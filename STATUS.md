@@ -47,7 +47,8 @@ This is libomtnet against itself: **still nothing about vMix, OBS or a Pi.**
 Rebuild recipe (outputs to a scratch dir, never into the repo):
 `g++ -O3 -std=c++17 -fdeclspec -fPIC -Wno-c++11-narrowing -dynamiclib reference/libvmx/src/vmxcodec_arm.cpp reference/libvmx/src/vmxcodec.cpp -o $OUT/libvmx.dylib`
 then `dotnet build interop/libomtnet-harness -c Release -p:LibVmx=$OUT/libvmx.dylib -o $OUT/harness`.
-Use `tshark ... -a duration:N` — it ignores SIGALRM.
+Use `tshark ... -a duration:N` — it ignores SIGALRM. After any `dotnet build`, run
+`dotnet build-server shutdown`: the compiler server otherwise stays resident.
 
 **Next step:** discovery (stage 2) so our receiver can find sources by name: browse and
 announce `_omt._tcp` with a maintained mDNS crate (check `mdns-sd` first), real OS host
