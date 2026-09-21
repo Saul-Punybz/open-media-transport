@@ -1,0 +1,5 @@
+DATE: ---Mon 21 Sep 2026---
+14:33:01.124  ...STARTING...
+Timestamp     A/R  Flags         IF  Hostname                               Address                                      TTL
+14:33:01.124  Add  40000003      14  Sauls-MacBook-Pro-omt.local.           FE80:0000:0000:0000:04A6:3A1C:277D:23F0%en0  120
+14:33:01.124  Add  40000002      14  Sauls-MacBook-Pro-omt.local.           172.16.80.59                                 120

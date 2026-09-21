@@ -1,0 +1,18 @@
+Browsing for _omt._tcp.local
+DATE: ---Mon 21 Sep 2026---
+14:32:29.889  ...STARTING...
+
+; To direct clients to browse a different domain, substitute that domain in place of '@'
+lb._dns-sd._udp                                 PTR     @
+
+; In the list of services below, the SRV records will typically reference dot-local Multicast DNS names.
+; When transferring this zone file data to your unicast DNS server, you'll need to replace those dot-local
+; names with the correct fully-qualified (unicast) domain name of the target host offering the service.
+
+_omt._tcp                                       PTR     SAULS-MACBOOK-PRO\.LOCAL\032(Rust\032Source)._omt._tcp
+SAULS-MACBOOK-PRO\.LOCAL\032(Rust\032Source)._omt._tcp SRV     0 0 6599 Sauls-MacBook-Pro-omt.local. ; Replace with unicast FQDN of target host
+SAULS-MACBOOK-PRO\.LOCAL\032(Rust\032Source)._omt._tcp TXT     ""
+
+_omt._tcp                                       PTR     SAULS-MACBOOK-PRO\.LOCAL\032(Rust\032Source)._omt._tcp
+SAULS-MACBOOK-PRO\.LOCAL\032(Rust\032Source)._omt._tcp SRV     0 0 6599 Sauls-MacBook-Pro-omt.local. ; Replace with unicast FQDN of target host
+SAULS-MACBOOK-PRO\.LOCAL\032(Rust\032Source)._omt._tcp TXT     ""

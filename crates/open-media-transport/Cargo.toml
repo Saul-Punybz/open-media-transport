@@ -11,6 +11,8 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+mdns-sd = { version = "0.21", default-features = false }
+hostname = "0.4"
 
 [dev-dependencies]
 vmx-codec = { path = "../vmx-codec" }

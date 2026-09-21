@@ -48,6 +48,7 @@
 
 pub mod command;
 mod deframer;
+pub mod discovery;
 pub mod frame;
 pub mod receiver;
 

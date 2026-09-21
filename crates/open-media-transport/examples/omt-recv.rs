@@ -2,7 +2,10 @@
 //!
 //! ```sh
 //! cargo run -p open-media-transport --example omt-recv -- 127.0.0.1:6400 5
+//! cargo run -p open-media-transport --example omt-recv -- "MY-MAC.LOCAL (Camera)" 5
 //! ```
+//!
+//! A name containing `(` is looked up with DNS-SD first.
 //!
 //! Video is decoded to UYVY with `vmx-codec`. For frames that carry per-frame
 //! metadata it prints a `pixels` line in the same format as
@@ -11,23 +14,30 @@
 //! `<HarnessFrame N="n" />`, it also compares the pixels with the pattern the
 //! harness sent and prints the PSNR.
 
-use std::net::ToSocketAddrs;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::{Duration, Instant};
 
 use open_media_transport::command::{classify, Message, Quality, Tally};
+use open_media_transport::discovery::{Discovery, SourceEvent};
 use open_media_transport::frame::{ExtendedHeader, CODEC_FPA1, CODEC_VMX1};
 use open_media_transport::receiver::{Event, Receiver, ReceiverConfig};
 use vmx_codec::{Decoder, PixelFormat};
 
 fn main() {
     let mut args = std::env::args().skip(1);
-    let addr = args
+    let target = args
         .next()
-        .expect("usage: omt-recv HOST:PORT [SECONDS]")
-        .to_socket_addrs()
-        .expect("resolve address")
-        .next()
-        .expect("no address");
+        .expect("usage: omt-recv HOST:PORT|\"MACHINE (Name)\" [SECONDS]");
+    let addr = if target.contains('(') {
+        find(&target, Duration::from_secs(5))
+    } else {
+        target
+            .to_socket_addrs()
+            .expect("resolve address")
+            .next()
+            .expect("no address")
+    };
+    println!("connecting to {addr}");
     let seconds: u64 = args.next().map(|s| s.parse().unwrap()).unwrap_or(5);
 
     let config = ReceiverConfig {
@@ -118,6 +128,27 @@ fn main() {
         }
     }
     println!("done video={video} audio={audio} ch0_rms={audio_rms:.4} ch1_silent={silent_ch1}");
+}
+
+/// Browses until `full_name` resolves; returns its first address (IPv4 first).
+fn find(full_name: &str, timeout: Duration) -> SocketAddr {
+    let d = Discovery::new().expect("start mDNS");
+    let browser = d.browse().expect("browse");
+    let deadline = Instant::now() + timeout;
+    while let Some(left) = deadline.checked_duration_since(Instant::now()) {
+        if let Some(SourceEvent::Resolved(s)) = browser.recv_timeout(left) {
+            if s.full_name == full_name {
+                if let Some(ip) = s.addresses.first() {
+                    println!(
+                        "discovered \"{}\" at {}:{} ({})",
+                        s.full_name, ip, s.port, s.host
+                    );
+                    return SocketAddr::new(*ip, s.port);
+                }
+            }
+        }
+    }
+    panic!("\"{full_name}\" not found within {timeout:?}");
 }
 
 /// The UYVY test pattern `libomtnet-harness send` generates for frame `n`.

@@ -1,0 +1,2 @@
+resolved "SAULS-MACBOOK-PRO.LOCAL (Disc A)" host=Sauls-MacBook-Pro.local. port=6400 addresses=[127.0.0.1, ::1, fe80::1]
+resolved "SAULS-MACBOOK-PRO.LOCAL (Disc A)" host=Sauls-MacBook-Pro.local. port=6400 addresses=[127.0.0.1, 172.16.80.59, ::1, fe80::1, fe80::4a6:3a1c:277d:23f0]

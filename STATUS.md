@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 21 Sep 2026 — our receiver works against a libomtnet sender (loopback).
+**Last updated:** 21 Sep 2026 — discovery works both ways against libomtnet (one Mac).
 
 ## RESUME HERE
 
@@ -15,7 +15,7 @@ Public repo `Saul-Punybz/open-media-transport`, licensed MIT OR Apache-2.0.
 |---|---|---|
 | `vmx-codec` | The OMT video codec, a safe-Rust port of `libvmx` | **Done.** Byte-identical to the C++ reference both ways, at any thread count. Conformance tests build upstream at `544bcfb`. |
 | `libvmx-ref` | Builds the upstream C++ reference | Test-only. |
-| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Wire format + minimal receiver.** Received from a real libomtnet sender with pixels identical to libomtnet's own receiver (`docs/INTEROP.md`). No discovery, no sender, no reconnect yet. 24 tests, 4 on captured bytes. |
+| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Wire format, minimal receiver, discovery.** Receives from libomtnet with pixels identical to its own receiver; finds libomtnet sources and is listed by libomtnet (`docs/INTEROP.md`). No sender, no reconnect yet. 29 tests, 4 on captured bytes. |
 
 **What is NOT true yet, and must not be claimed:** nothing has talked to vMix, OBS or
 the Raspberry Pi devices. Our receiver has talked to libomtnet itself, on one Mac, over
@@ -50,10 +50,14 @@ then `dotnet build interop/libomtnet-harness -c Release -p:LibVmx=$OUT/libvmx.dy
 Use `tshark ... -a duration:N` — it ignores SIGALRM. After any `dotnet build`, run
 `dotnet build-server shutdown`: the compiler server otherwise stays resident.
 
-**Next step:** discovery (stage 2) so our receiver can find sources by name: browse and
-announce `_omt._tcp` with a maintained mDNS crate (check `mdns-sd` first), real OS host
-name (D3), evidence with `dns-sd`/`tshark`. Then the sender (stage 4), tested against the
-libomtnet harness receiver the same way.
+**Discovery decision (21 Sep 2026):** `mdns-sd` with the SRV target `<host>-omt.local.`,
+not the OS host name — naming the OS host made `mdns-sd` conflict with macOS's responder
+and rename itself (`docs/evidence/2026-09-21-our-discovery`). Loopback interfaces are
+excluded by kind and by name (`lo0`, `lo`).
+
+**Next step:** the sender (stage 4): listen on 6400–6600, answer subscriptions, send
+VMX1 via `vmx-codec` and FPA1, announce with `discovery`. Test it against the libomtnet
+harness receiver, compare pixels the same way, capture with `tshark`.
 
 ## House rules
 
