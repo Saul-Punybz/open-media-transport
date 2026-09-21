@@ -60,9 +60,13 @@ excluded by kind and by name (`lo0`, `lo`).
 downloaded binary from a terminal (`TESTING.md`). Not ready for end users: no GUI, unsigned
 binaries, only libomtnet-on-one-Mac verified. CI (`.github/workflows/ci.yml`) builds and
 tests on macOS, Linux and Windows — green since `a6a23b9` (21 Sep 2026). That proves the
-code builds and its unit/loopback tests pass there, not that it interoperates there. `release.yml` builds `omt` for four targets into a
-**draft** GitHub release when a `v*` tag is pushed — no tag has been pushed; that is the
-maintainer's call.
+code builds and its unit/loopback tests pass there, not that it interoperates there.
+
+**v0.1.0 tagged (21 Sep 2026)** with the maintainer's go-ahead. `release.yml` built `omt` for
+aarch64/x86_64 macOS, x86_64 Linux and x86_64 Windows into a **draft** release. The macOS
+arm64 archive, downloaded from that draft, was run against libomtnet both ways and works;
+the other three archives have not been run. Publishing the draft is the maintainer's call. `release.yml` builds `omt` for four targets into a
+**draft** GitHub release when a `v*` tag is pushed.
 
 **Next step:** get reports from real products (`TESTING.md` §3) and record them in
 `docs/INTEROP.md`. Code gaps: redirect (§9), discovery server (§10), re-resolving a source

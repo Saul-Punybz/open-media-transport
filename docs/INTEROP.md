@@ -13,9 +13,10 @@ whatever the code suggests.
 | 2026-09-21 | receiver in preview | libomtnet sender | 1.0.0.19 | macOS 26.5.1, loopback | **works**: 80x45 preview, pixels identical to libomtnet's receiver; upstream's garbage per-frame metadata (U2) seen by both | [`evidence/2026-09-21-preview`](evidence/2026-09-21-preview/README.md) (P1) |
 | 2026-09-21 | sender serving preview | libomtnet receiver in preview | 1.0.0.19 | macOS 26.5.1, LAN address | **works**: preview pixels identical on both receivers and to libomtnet's sender; correct per-frame metadata | [`evidence/2026-09-21-preview`](evidence/2026-09-21-preview/README.md) (P2) |
 | 2026-09-21 | receiver reconnect | libomtnet sender, restarted | 1.0.0.19 | macOS 26.5.1, loopback | **works**: closed on reset, reconnected within 1 s, frames resumed from the new sender | [`evidence/2026-09-21-reconnect`](evidence/2026-09-21-reconnect/README.md) |
+| 2026-09-21 | **released binary** `omt` v0.1.0 (aarch64-apple-darwin, downloaded from the draft GitHub release) — send and recv | libomtnet receiver / sender | 1.0.0.19 | macOS 26.5.1, one host | **works** both ways: 120 video frames at 1280x720 received by libomtnet; 30 fps, 0 decode errors, snapshot saved from libomtnet's stream | this table row; archive SHA-256 prefix `24b46152c6545d5c` |
 
 ## Not yet tested
 
 - Redirect, the discovery server.
 - vMix, OBS with the OMT plugin, SIENNA tools, the Raspberry Pi encoder/decoder.
-- Anything across a real network, or on Windows or Linux.
+- Anything across a real network, or on Windows or Linux (their v0.1.0 binaries were built by CI but never run).
