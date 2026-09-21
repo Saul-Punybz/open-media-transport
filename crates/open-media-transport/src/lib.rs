@@ -14,10 +14,10 @@
 //! ## Status
 //!
 //! The wire format — frame headers ([`frame`]), protocol commands
-//! ([`command`]), an incremental frame parser ([`Deframer`]) — and a minimal
-//! blocking [`receiver`]. No discovery and no sender yet. The receiver
-//! handshake is byte-identical to libomtnet's (`tests/captured.rs`); nothing
-//! has been tested against vMix, OBS or other OMT products.
+//! ([`command`]), an incremental frame parser ([`Deframer`]) — a minimal
+//! blocking [`receiver`] and DNS-SD [`discovery`]. No sender yet. Tested
+//! against libomtnet only (`docs/INTEROP.md`); not against vMix, OBS or other
+//! OMT products.
 //!
 //! ## The wire format in one paragraph
 //!

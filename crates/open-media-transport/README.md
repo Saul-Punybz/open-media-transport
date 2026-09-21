@@ -13,10 +13,12 @@ the MIT license. Video uses the [`vmx-codec`](../vmx-codec) crate.
 - `Deframer` — splits a TCP byte stream into frames, with explicit size limits;
   a malformed peer produces an error instead of a stalled connection
 - `receiver` — a minimal blocking receiver that connects the way libomtnet does
+- `discovery` — announce and browse `_omt._tcp` over mDNS, with libomtnet's naming
 
 The receiver has been run against a libomtnet sender and decoded the same pixels
 as libomtnet's own receiver; see `docs/INTEROP.md` for exactly what was tested.
-No discovery, no sender yet, and nothing tested against vMix or OBS.
+Discovery works both ways against libomtnet. No sender yet, and nothing tested
+against vMix or OBS.
 
 The protocol is implemented from [`docs/PROTOCOL.md`](../../docs/PROTOCOL.md),
 which describes what the reference implementation,
