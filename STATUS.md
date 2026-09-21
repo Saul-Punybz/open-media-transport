@@ -59,7 +59,7 @@ excluded by kind and by name (`lo0`, `lo`).
 1. A second machine on the LAN (another Mac, or a Linux box with Avahi), both directions.
 2. A real product: OBS with the OMT plugin, SIENNA's macOS OMT tools, or vMix's free tools
    on a Windows PC. Needs the user to install or provide them.
-Code gaps meanwhile: reconnect on the receiver, preview tested against libomtnet, timestamp
+Code gaps meanwhile: reconnect on the receiver, timestamp
 generation/pacing (C2, C3) in the sender, fuzz targets for the deframer.
 
 ## House rules

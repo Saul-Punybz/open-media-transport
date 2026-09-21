@@ -1,0 +1,27 @@
+log: 9/21/2026 3:30:29 PM,[OMTLogging],Log Started
+log: 9/21/2026 3:30:29 PM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/21/2026 3:30:29 PM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/21/2026 3:30:29 PM,[OMTDiscoveryDnsSd],RegisterAddress: SAULS-MACBOOK-PRO.LOCAL (Harness)
+send address=SAULS-MACBOOK-PRO.LOCAL (Harness) url=omt://SAULS-MACBOOK-PRO.LOCAL:6400 port=6400
+log: 9/21/2026 3:30:29 PM,[OMTDiscovery],AddIP: SAULS-MACBOOK-PRO.LOCAL (Harness):6400,::1
+log: 9/21/2026 3:30:29 PM,[OMTDiscovery],AddIP: SAULS-MACBOOK-PRO.LOCAL (Harness):6400,172.16.80.59
+log: 9/21/2026 3:30:32 PM,[OMTChannel],KeepAlive.Enabled
+log: 9/21/2026 3:30:32 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:55287
+log: 9/21/2026 3:30:32 PM,[OMTChannel],KeepAlive.Enabled
+log: 9/21/2026 3:30:32 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:55288
+send tally preview=0 program=1
+log: 9/21/2026 3:30:33 PM,[OMTChannel],KeepAlive.Enabled
+log: 9/21/2026 3:30:33 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:55332
+log: 9/21/2026 3:30:33 PM,[OMTChannel],KeepAlive.Enabled
+log: 9/21/2026 3:30:33 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:55333
+log: 9/21/2026 3:30:38 PM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/21/2026 3:30:38 PM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/21/2026 3:30:38 PM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/21/2026 3:30:38 PM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/21/2026 3:30:38 PM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/21/2026 3:30:38 PM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/21/2026 3:30:38 PM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/21/2026 3:30:38 PM,[OMTSend.RemoveChannel],RemoveConnection
+send tally preview=0 program=0
+send done connections=0
+log: 9/21/2026 3:30:41 PM,[OMTDiscoveryDnsSd],DeRegisterAddress: SAULS-MACBOOK-PRO.LOCAL (Harness)

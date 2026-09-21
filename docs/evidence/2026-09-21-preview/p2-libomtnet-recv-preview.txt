@@ -1,0 +1,25 @@
+recv metadata ts=0 len=87 xml="<OMTInfo ProductName=\x22omt-send\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1.0\x22 />\x00"
+recv metadata ts=0 len=27 xml="<HarnessHello Value=\x221\x22 />\x00"
+recv metadata ts=0 len=87 xml="<OMTInfo ProductName=\x22omt-send\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1.0\x22 />\x00"
+recv metadata ts=0 len=27 xml="<HarnessHello Value=\x221\x22 />\x00"
+recv video ts=38333295 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7198 meta=""
+recv audio ts=38333295 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=39999960 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7154 meta="<HarnessFrame N=\x22120\x22 />\x00"
+pixels <HarnessFrame N=\x22120\x22 />\x00 fnv1a64=6ed6ddd5c2557c65 stride=160
+recv video ts=48333285 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7204 meta=""
+recv audio ts=48333285 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=49999950 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7272 meta="<HarnessFrame N=\x22150\x22 />\x00"
+pixels <HarnessFrame N=\x22150\x22 />\x00 fnv1a64=a7b39d5ff9c1cc45 stride=160
+recv video ts=58333275 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7270 meta=""
+recv audio ts=58333275 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=59999940 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7271 meta="<HarnessFrame N=\x22180\x22 />\x00"
+pixels <HarnessFrame N=\x22180\x22 />\x00 fnv1a64=12b3314f0722bf25 stride=160
+recv video ts=68333265 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7265 meta=""
+recv audio ts=68333265 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=69999930 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7269 meta="<HarnessFrame N=\x22210\x22 />\x00"
+pixels <HarnessFrame N=\x22210\x22 />\x00 fnv1a64=7b09f1004fb306c5 stride=160
+recv video ts=78333255 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7269 meta=""
+recv audio ts=78333255 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=79999920 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7202 meta="<HarnessFrame N=\x22240\x22 />\x00"
+pixels <HarnessFrame N=\x22240\x22 />\x00 fnv1a64=743993df7456fee5 stride=160
+recv done video=150 audio=149 info=omt-send/open-media-transport/0.1.0

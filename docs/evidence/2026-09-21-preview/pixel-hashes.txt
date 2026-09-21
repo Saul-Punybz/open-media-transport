@@ -1,0 +1,19 @@
+# P1: libomtnet sender; both receivers in preview
+## identical
+pixels \x9B\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=a7b39d5ff9c1cc45 stride=160
+pixels \xB8\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=12b3314f0722bf25 stride=160
+pixels \xDE\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=050a4384abcf23e5 stride=160
+pixels \xF2\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=7b09f1004fb306c5 stride=160
+pixels +\x09\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xC0 fnv1a64=743993df7456fee5 stride=160
+## only ours
+pixels \x84\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=6ed6ddd5c2557c65 stride=160
+
+# P2: our sender; both receivers in preview
+## identical
+pixels <HarnessFrame N=\x22120\x22 />\x00 fnv1a64=6ed6ddd5c2557c65 stride=160
+pixels <HarnessFrame N=\x22150\x22 />\x00 fnv1a64=a7b39d5ff9c1cc45 stride=160
+pixels <HarnessFrame N=\x22180\x22 />\x00 fnv1a64=12b3314f0722bf25 stride=160
+pixels <HarnessFrame N=\x22210\x22 />\x00 fnv1a64=7b09f1004fb306c5 stride=160
+pixels <HarnessFrame N=\x22240\x22 />\x00 fnv1a64=743993df7456fee5 stride=160
+## only ours
+pixels <HarnessFrame N=\x2290\x22 />\x00 fnv1a64=5a5ebb31f46b7665 stride=160

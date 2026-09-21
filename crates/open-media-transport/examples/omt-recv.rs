@@ -5,7 +5,9 @@
 //! cargo run -p open-media-transport --example omt-recv -- "MY-MAC.LOCAL (Camera)" 5
 //! ```
 //!
-//! A name containing `(` is looked up with DNS-SD first.
+//! A name containing `(` is looked up with DNS-SD first. A third argument
+//! `preview` asks for 1/8 preview video (§6.2); preview frames are decoded
+//! with `decode_preview` and hashed as UYVY, like libomtnet delivers them.
 //!
 //! Video is decoded to UYVY with `vmx-codec`. For frames that carry per-frame
 //! metadata it prints a `pixels` line in the same format as
@@ -19,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use open_media_transport::command::{classify, Message, Quality, Tally};
 use open_media_transport::discovery::{Discovery, SourceEvent};
-use open_media_transport::frame::{ExtendedHeader, CODEC_FPA1, CODEC_VMX1};
+use open_media_transport::frame::{ExtendedHeader, VideoFlags, CODEC_FPA1, CODEC_VMX1};
 use open_media_transport::receiver::{Event, Receiver, ReceiverConfig};
 use vmx_codec::{Decoder, PixelFormat};
 
@@ -39,8 +41,10 @@ fn main() {
     };
     println!("connecting to {addr}");
     let seconds: u64 = args.next().map(|s| s.parse().unwrap()).unwrap_or(5);
+    let preview = args.next().as_deref() == Some("preview");
 
     let config = ReceiverConfig {
+        preview,
         quality: Quality::High,
         tally: Tally {
             preview: false,
@@ -84,6 +88,28 @@ fn main() {
                     decoder = Some((w, h, Decoder::new(w as usize, h as usize).expect("decoder")));
                 }
                 let dec = &mut decoder.as_mut().unwrap().2;
+                if v.flags.contains(VideoFlags::PREVIEW) {
+                    let pv = dec.decode_preview(&f.data, false).expect("decode preview");
+                    if video == 1 || !f.metadata.is_empty() {
+                        let uyvy = planar_to_uyvy(&pv);
+                        println!(
+                            "preview {}x{} data={} meta=\"{}\"",
+                            pv.width,
+                            pv.height,
+                            f.data.len(),
+                            printable(&f.metadata)
+                        );
+                        if !f.metadata.is_empty() {
+                            println!(
+                                "pixels {} fnv1a64={:016x} stride={}",
+                                printable(&f.metadata),
+                                fnv1a64(&uyvy),
+                                pv.width * 2
+                            );
+                        }
+                    }
+                    continue;
+                }
                 let px = dec.decode(&f.data, PixelFormat::Uyvy).expect("decode VMX1");
                 if !f.metadata.is_empty() {
                     let fm = printable(&f.metadata);
@@ -149,6 +175,21 @@ fn find(full_name: &str, timeout: Duration) -> SocketAddr {
         }
     }
     panic!("\"{full_name}\" not found within {timeout:?}");
+}
+
+/// Packs a `Yuv422p` frame (what `decode_preview` returns) as UYVY.
+fn planar_to_uyvy(f: &vmx_codec::Frame) -> Vec<u8> {
+    let (yp, up, vp) = (&f.planes[0], &f.planes[1], &f.planes[2]);
+    let mut out = Vec::with_capacity(f.width * 2 * f.height);
+    for y in 0..f.height {
+        for x in (0..f.width).step_by(2) {
+            out.push(up.data[y * up.stride + x / 2]);
+            out.push(yp.data[y * yp.stride + x]);
+            out.push(vp.data[y * vp.stride + x / 2]);
+            out.push(yp.data[y * yp.stride + x + 1]);
+        }
+    }
+    out
 }
 
 /// The UYVY test pattern `libomtnet-harness send` generates for frame `n`.

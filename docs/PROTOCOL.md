@@ -17,6 +17,8 @@ capture of a running implementation shows the behaviour. Empty means not yet see
 - **[L]** — libomtnet talking to itself over loopback on macOS, captured with `tshark`
   and `dns-sd`: [`evidence/2026-09-21-libomtnet-loopback`](evidence/2026-09-21-libomtnet-loopback/README.md).
   This confirms what libomtnet does; it says nothing yet about vMix, OBS or a Pi.
+- **[P]** — preview mode, libomtnet sender and receiver, same setup:
+  [`evidence/2026-09-21-preview`](evidence/2026-09-21-preview/README.md).
 
 The header layouts in §3.1, §3.3 and §3.4 were also confirmed by [L]: our parser
 read every frame of both connections with no error. On macOS, D3 and D5 are
@@ -242,16 +244,16 @@ while the header says "no alpha". Receivers ignore it because the flag is clear.
 
 | # | Statement | Source | Live |
 |---|---|---|---|
-| P1 | For a connection in preview mode the sender sends the same header and extended header (with flag 8 added), and a `DataLength` of `32 + EncodedPreviewLength + MetadataLength`. | `OMTFrame.cs:176-178,193-196,302-305`, `OMTSend.cs:750` | |
-| P2 | The bytes sent are the **first** `EncodedPreviewLength + MetadataLength` bytes of the VMX frame: the preview is a prefix of the full bitstream. | `OMTChannel.cs:220-223`, `OMTFrame.cs:331-334` | |
-| P3 | The receiver decodes it with `VMX_DecodePreview*`. The output is width/8 (rounded up to even) × height/8 (made even when interlaced). | `OMTReceive.cs:797-836`, `codecs/OMTVMX1Codec.cs:245-262` | |
+| P1 | For a connection in preview mode the sender sends the same header and extended header (with flag 8 added), and a `DataLength` of `32 + EncodedPreviewLength + MetadataLength`. | `OMTFrame.cs:176-178,193-196,302-305`, `OMTSend.cs:750` |  2026-09-21 [P] |
+| P2 | The bytes sent are the **first** `EncodedPreviewLength + MetadataLength` bytes of the VMX frame: the preview is a prefix of the full bitstream. | `OMTChannel.cs:220-223`, `OMTFrame.cs:331-334` |  2026-09-21 [P] |
+| P3 | The receiver decodes it with `VMX_DecodePreview*`. The output is width/8 (rounded up to even) × height/8 (made even when interlaced). | `OMTReceive.cs:797-836`, `codecs/OMTVMX1Codec.cs:245-262` |  2026-09-21 [P] |
 | P4 | For forwarded VMX1 frames the "preview" length is the full length, so preview receivers get the whole frame with flag 8 set. | `OMTSend.cs:772` | |
 
-**Suspected upstream bug.** Because of P2, when a frame has per-frame metadata the
+**Upstream bug, confirmed [P].** Because of P2, when a frame has per-frame metadata the
 last `MetadataLength` bytes of a preview frame are VMX bytes, not the metadata (the
 metadata sits after the *full* bitstream, `OMTSend.cs:743-747`). A receiver following
-§3.2 then reads garbage as metadata. To confirm with a capture before deciding
-whether to reproduce or fix it.
+§3.2 then reads garbage as metadata; libomtnet's own receiver shows it. Our sender
+fixes it (real metadata after the prefix), and libomtnet's receiver reads that correctly.
 
 `vmx-codec` already has `Decoder::preview_len` and `Decoder::decode_preview`
 (`crates/vmx-codec/src/decoder.rs:70,122`).
@@ -355,7 +357,7 @@ None affects a conforming receiver except the preview one. Listed so nobody
 | # | What | Source | Wire impact |
 |---|---|---|---|
 | U1 | `C32 = 2147483658` instead of 2^31 | `OMTFrame.cs:69` | none (enum member unused) |
-| U2 | Preview frames with per-frame metadata carry VMX bytes where the metadata should be | `OMTSend.cs:743-750`, `OMTChannel.cs:220-223` | yes, suspected (§6.2) |
+| U2 | Preview frames with per-frame metadata carry VMX bytes where the metadata should be | `OMTSend.cs:743-750`, `OMTChannel.cs:220-223` | yes, **confirmed** [P] (§6.2); fixed in our sender |
 | U3 | Opaque BGRA encoded with `EncodeBGRA` | `codecs/OMTVMX1Codec.cs:167-168` | bitstream differs from `EncodeBGRX`; decodes the same (V4) |
 | U4 | Port-range loop stops on the compile-time end port, not the configured one | `OMTSend.cs:114` | only with custom `NetworkPortEnd` |
 | U5 | `IsEmpty` adds the buffer offset twice | `codecs/OMTFPA1Codec.cs:62,75` | none while the offset is 0, which it is (`OMTSend.cs:810`) |
@@ -371,5 +373,5 @@ Open items that a capture must settle before calling it done:
 1. ~~M2~~ confirmed [L]; M3 (a NUL-terminated command is ignored) still to test.
 2. T5 (two connections) confirmed [L]; whether one connection for both also works is untested.
 3. ~~`<OMTInfo>` bytes~~ confirmed [L]; `<OMTRedirect>` bytes still unseen.
-4. U2: preview + per-frame metadata.
+4. ~~U2~~ confirmed [P].
 5. D3/D6: the instance names real senders on macOS and Windows actually publish.

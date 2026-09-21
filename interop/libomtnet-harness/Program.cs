@@ -3,7 +3,7 @@
 //   send NAME SECONDS          announce NAME and send 640x360 UYVY video (30 fps),
 //                              stereo audio with a silent right channel, per-frame
 //                              metadata every 30th frame, and sender info
-//   recv ADDRESS SECONDS [compressed]
+//   recv ADDRESS SECONDS [compressed|preview]
 //                              connect to "MACHINE (Name)" or omt://host:port, set
 //                              tally to program and quality to High, print every frame
 //   list SECONDS               print what discovery finds
@@ -26,7 +26,7 @@ static class Program
         switch (args[0])
         {
             case "send" when args.Length >= 3: return Send(args[1], int.Parse(args[2]));
-            case "recv" when args.Length >= 3: return Recv(args[1], int.Parse(args[2]), args.Length > 3 && args[3] == "compressed");
+            case "recv" when args.Length >= 3: return Recv(args[1], int.Parse(args[2]), args.Length > 3 ? args[3] : "");
             case "list": return List(int.Parse(args[1]));
             default: return Usage();
         }
@@ -34,7 +34,7 @@ static class Program
 
     static int Usage()
     {
-        Console.Error.WriteLine("usage: send NAME SECONDS | recv ADDRESS SECONDS [compressed] | list SECONDS");
+        Console.Error.WriteLine("usage: send NAME SECONDS | recv ADDRESS SECONDS [compressed|preview] | list SECONDS");
         return 2;
     }
 
@@ -103,9 +103,10 @@ static class Program
         return 0;
     }
 
-    static int Recv(string address, int seconds, bool compressedOnly)
+    static int Recv(string address, int seconds, string mode)
     {
-        var flags = compressedOnly ? OMTReceiveFlags.CompressedOnly : OMTReceiveFlags.None;
+        var flags = mode == "compressed" ? OMTReceiveFlags.CompressedOnly
+            : mode == "preview" ? OMTReceiveFlags.Preview : OMTReceiveFlags.None;
         using var recv = new OMTReceive(address, OMTFrameType.Video | OMTFrameType.Audio | OMTFrameType.Metadata,
             OMTPreferredVideoFormat.UYVY, flags);
         recv.SetTally(new OMTTally(0, 1));

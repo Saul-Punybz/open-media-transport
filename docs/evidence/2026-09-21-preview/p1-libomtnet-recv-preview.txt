@@ -1,0 +1,25 @@
+recv metadata ts=0 len=88 xml="<OMTInfo ProductName=\x22omt-harness\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1\x22 />\x00"
+recv metadata ts=0 len=27 xml="<HarnessHello Value=\x221\x22 />\x00"
+recv metadata ts=0 len=88 xml="<OMTInfo ProductName=\x22omt-harness\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1\x22 />\x00"
+recv metadata ts=0 len=27 xml="<HarnessHello Value=\x221\x22 />\x00"
+recv video ts=40666626 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7199 meta=""
+recv audio ts=40666626 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=49999950 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7272 meta="\x9B\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC"
+pixels \x9B\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=a7b39d5ff9c1cc45 stride=160
+recv video ts=50666616 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7204 meta=""
+recv audio ts=50666616 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=59999940 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7271 meta="\xB8\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC"
+pixels \xB8\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=12b3314f0722bf25 stride=160
+recv video ts=60666606 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7271 meta=""
+recv audio ts=60666606 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=69999930 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7269 meta="\xF2\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC"
+pixels \xF2\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=7b09f1004fb306c5 stride=160
+recv video ts=70666596 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7269 meta=""
+recv audio ts=70666596 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=79999920 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7202 meta="+\x09\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xC0"
+pixels +\x09\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xC0 fnv1a64=743993df7456fee5 stride=160
+recv video ts=80666586 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7269 meta=""
+recv audio ts=80666586 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=89999910 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=7203 meta="\xDE\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC"
+pixels \xDE\x08\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=050a4384abcf23e5 stride=160
+recv done video=150 audio=149 info=omt-harness/open-media-transport/0.1
