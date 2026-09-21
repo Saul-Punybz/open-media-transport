@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 21 Sep 2026 — discovery works both ways against libomtnet (one Mac).
+**Last updated:** 21 Sep 2026 — receiver, sender and discovery all work against libomtnet (one Mac).
 
 ## RESUME HERE
 
@@ -15,11 +15,11 @@ Public repo `Saul-Punybz/open-media-transport`, licensed MIT OR Apache-2.0.
 |---|---|---|
 | `vmx-codec` | The OMT video codec, a safe-Rust port of `libvmx` | **Done.** Byte-identical to the C++ reference both ways, at any thread count. Conformance tests build upstream at `544bcfb`. |
 | `libvmx-ref` | Builds the upstream C++ reference | Test-only. |
-| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Wire format, minimal receiver, discovery.** Receives from libomtnet with pixels identical to its own receiver; finds libomtnet sources and is listed by libomtnet (`docs/INTEROP.md`). No sender, no reconnect yet. 29 tests, 4 on captured bytes. |
+| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Receiver, sender, discovery.** Against libomtnet 1.0.0.19 on one Mac: we receive what it sends and it receives what we send, with identical decoded pixels both ways, each side finding the other by name (`docs/INTEROP.md`). No reconnect, redirect or discovery server yet. 34 tests. |
 
 **What is NOT true yet, and must not be claimed:** nothing has talked to vMix, OBS or
-the Raspberry Pi devices. Our receiver has talked to libomtnet itself, on one Mac, over
-loopback (`docs/INTEROP.md`) — that is the whole of our interop evidence. Matching
+the Raspberry Pi devices. Our receiver, sender and discovery have talked to libomtnet itself,
+on one Mac (`docs/INTEROP.md`) — that is the whole of our interop evidence. Matching
 the reference implementation's bytes proves the codec; it is not a live handshake.
 `vmx-codec` has no SIMD, so it encodes 2.2x-3.2x slower than the C reference
 (`crates/vmx-codec/BENCH.md`) — one core still does 1080p60 at OMT's default quality.
@@ -55,9 +55,12 @@ not the OS host name — naming the OS host made `mdns-sd` conflict with macOS's
 and rename itself (`docs/evidence/2026-09-21-our-discovery`). Loopback interfaces are
 excluded by kind and by name (`lo0`, `lo`).
 
-**Next step:** the sender (stage 4): listen on 6400–6600, answer subscriptions, send
-VMX1 via `vmx-codec` and FPA1, announce with `discovery`. Test it against the libomtnet
-harness receiver, compare pixels the same way, capture with `tshark`.
+**Next step:** evidence beyond libomtnet-on-one-Mac, which is now the limiting factor:
+1. A second machine on the LAN (another Mac, or a Linux box with Avahi), both directions.
+2. A real product: OBS with the OMT plugin, SIENNA's macOS OMT tools, or vMix's free tools
+   on a Windows PC. Needs the user to install or provide them.
+Code gaps meanwhile: reconnect on the receiver, preview tested against libomtnet, timestamp
+generation/pacing (C2, C3) in the sender, fuzz targets for the deframer.
 
 ## House rules
 

@@ -15,7 +15,7 @@
 //!
 //! The wire format — frame headers ([`frame`]), protocol commands
 //! ([`command`]), an incremental frame parser ([`Deframer`]) — a minimal
-//! blocking [`receiver`] and DNS-SD [`discovery`]. No sender yet. Tested
+//! blocking [`receiver`], a [`sender`] and DNS-SD [`discovery`]. Tested
 //! against libomtnet only (`docs/INTEROP.md`); not against vMix, OBS or other
 //! OMT products.
 //!
@@ -51,6 +51,7 @@ mod deframer;
 pub mod discovery;
 pub mod frame;
 pub mod receiver;
+pub mod sender;
 
 pub use deframer::{Deframer, Limits, OwnedFrame};
 

@@ -1,0 +1,22 @@
+# Decoded-pixel hashes
+## libomtnet receiver vs our receiver, same run (our sender)
+### both
+pixels <HarnessFrame N=\x22120\x22 />\x00 fnv1a64=9bce0f7d66609e3a stride=1280
+pixels <HarnessFrame N=\x22150\x22 />\x00 fnv1a64=143f961a4463856e stride=1280
+pixels <HarnessFrame N=\x22180\x22 />\x00 fnv1a64=e1d3522ba9bfa171 stride=1280
+pixels <HarnessFrame N=\x22210\x22 />\x00 fnv1a64=422a59724576bde3 stride=1280
+pixels <HarnessFrame N=\x22240\x22 />\x00 fnv1a64=400d76637078870e stride=1280
+pixels <HarnessFrame N=\x22270\x22 />\x00 fnv1a64=6df99b0516e62811 stride=1280
+### only ours (libomtnet receiver not yet connected / already gone)
+pixels <HarnessFrame N=\x22300\x22 />\x00 fnv1a64=7ab4b3dfb8c81b87 stride=1280
+### only libomtnet
+
+## Our sender (this run) vs libomtnet's sender (evidence/2026-09-21-our-receiver-vs-libomtnet), same input frames
+### identical
+pixels <HarnessFrame N=\x22120\x22 />\x00 fnv1a64=9bce0f7d66609e3a stride=1280
+pixels <HarnessFrame N=\x22150\x22 />\x00 fnv1a64=143f961a4463856e stride=1280
+pixels <HarnessFrame N=\x22180\x22 />\x00 fnv1a64=e1d3522ba9bfa171 stride=1280
+pixels <HarnessFrame N=\x22210\x22 />\x00 fnv1a64=422a59724576bde3 stride=1280
+pixels <HarnessFrame N=\x22240\x22 />\x00 fnv1a64=400d76637078870e stride=1280
+pixels <HarnessFrame N=\x22270\x22 />\x00 fnv1a64=6df99b0516e62811 stride=1280
+pixels <HarnessFrame N=\x22300\x22 />\x00 fnv1a64=7ab4b3dfb8c81b87 stride=1280

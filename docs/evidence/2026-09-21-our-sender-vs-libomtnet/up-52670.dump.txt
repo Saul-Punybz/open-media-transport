@@ -1,0 +1,5 @@
+    0 Metadata ts=0 mlen=0 dlen=32 command SubscribeMetadata "<OMTSubscribe Metadata=\x22true\x22 />"
+    1 Metadata ts=0 mlen=0 dlen=29 command SubscribeVideo "<OMTSubscribe Video=\x22true\x22 />"
+    2 Metadata ts=0 mlen=0 dlen=30 command Quality(High) "<OMTSettings Quality=\x22High\x22 />"
+    3 Metadata ts=0 mlen=0 dlen=44 command Tally(Tally { preview: false, program: true }) "<OMTTally Preview=\x22false\x22 Program==\x22true\x22 />"
+4 frames, 0 trailing bytes
