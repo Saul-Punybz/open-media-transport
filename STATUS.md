@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 21 Sep 2026 — stage 0 done (`docs/UPSTREAM.md`).
+**Last updated:** 21 Sep 2026 — stage 1 spec written (`docs/PROTOCOL.md`).
 
 ## RESUME HERE
 
@@ -24,19 +24,23 @@ the reference implementation's bytes proves the codec; it is not a live handshak
 (`crates/vmx-codec/BENCH.md`) — one core still does 1080p60 at OMT's default quality.
 Caudal does not speak OMT; that integration is Caudal's M12 and comes after this.
 
-**Stage 0 is done:** `docs/UPSTREAM.md` inventories `libomtnet` at `029ef4e` (v1.0.0.19),
-cloned in `reference/libomtnet`, plus every other upstream repo. Two findings change the picture:
+**Stages 0 and 1 are written.**
+- `docs/UPSTREAM.md` — inventory of libomtnet at `029ef4e` (v1.0.0.19) and every other upstream repo.
+- `docs/PROTOCOL.md` — the wire protocol as libomtnet's code implements it, every claim
+  cited to `file:line`. Its "Live" column is still empty: nothing is confirmed by capture.
+  It records where upstream's own `PROTOCOL.md` disagrees with the code (commands carry
+  no NUL; receivers open two TCP connections; `IPAddress` not `Address`; no TXT data).
+- `docs/COMPARISON.md` — decision (21 Sep 2026): **we build our own crate** and use the
+  community crate (MikanseiLaboratory/openmediatransport-rs) and `libomt-rs` only as
+  cross-checks. Their crate builds and its 100 self-tests pass, but it has no interop
+  evidence, and on macOS it announces itself as `LOCALHOST` (shown with `dns-sd`,
+  `docs/evidence/2026-09-21-community-crate-mdns/`).
 
-1. Upstream has exactly one protocol implementation, `libomtnet`. The OBS plugin and both
-   Raspberry Pi devices are built on it, so they are not independent interop evidence;
-   vMix might be, but it is closed and its implementation is unknown.
-2. **A pure-Rust OMT crate already exists**: MikanseiLaboratory/openmediatransport-rs
-   (MIT, ~9K lines, listed in upstream's `DOWNLOADS.md`, not on crates.io, unverified).
-   Whether to build on it, contribute to it, use it as a cross-check or ignore it is
-   an open decision for the maintainer — settle it before stage 1.
+**Blocked on a tool:** confirming the spec needs libomtnet running here, which needs the
+.NET SDK (not installed). Alternatives: vMix/SIENNA free OMT tools, OBS + plugin, a Pi.
 
-**Next step:** decide on the community crate, then `docs/PROTOCOL_PLAN.md` stage 1
-(`docs/PROTOCOL.md`, every claim citing upstream source `file:line`). Still no protocol code.
+**Next step:** the `open-media-transport` crate, starting with the wire format
+(`PROTOCOL.md` §3–4), then discovery (stage 2) with a `tshark` capture as evidence.
 
 ## House rules
 

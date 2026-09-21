@@ -1,0 +1,6 @@
+Browsing for _omt._tcp.local
+DATE: ---Mon 21 Sep 2026---
+12:37:21.087  ...STARTING...
+Timestamp     A/R    Flags  if Domain               Service Type         Instance Name
+12:37:21.088  Add        3   1 local.               _omt._tcp.           LOCALHOST (Colorbars)
+12:37:21.088  Add        2  14 local.               _omt._tcp.           LOCALHOST (Colorbars)

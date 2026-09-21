@@ -56,9 +56,10 @@ openmediatransport.org itself has no spec; it links to GitHub.
 
 - **Redirect.** `OMTRedirect.cs` and the `<OMTRedirect` prefix handled in
   `OMTChannel.cs:394-397` — a sender can point its receivers at another address.
-- **TXT records.** `mac/OMTDiscoveryDnsSd.cs:248` builds one on registration;
-  `PROTOCOL.md` mentions none. Whether Windows (`win32/`) and Linux (`linux/`)
-  publish the same TXT content is not yet known.
+- **TXT records.** None. *Corrected 21 Sep 2026:* an earlier version of this file
+  said `mac/OMTDiscoveryDnsSd.cs:248` builds a TXT record on registration. It defines
+  `CreateTXTRecord` but never calls it; all three platforms register with no TXT data
+  (see `PROTOCOL.md` D5).
 - **Port range.** Senders listen on 6400–6600 by default (`OMTConstants.cs:64-65`),
   overridable in `settings.xml` (`OMTSettings.cs:41-45`). Discovery server default
   port 6399 (`OMTConstants.cs:34`).
@@ -114,7 +115,7 @@ Port verdict:
 |---|---:|---|---|---|
 | `OMTDiscovery.cs` | 656 | D | **port** | Platform-neutral discovery: picks the platform back end (`:78-104`), keeps the table of discovered and registered entries, expiry, lookup by full name or URL, switches to the discovery server when `settings.xml` names one (`:50-66`). |
 | `OMTAddress.cs` | 338 | D S R | **port** | Source naming (`MACHINE (Name)`), escaping/sanitising, validity, `omt://` URLs, address lists, `OMTAddress` XML for the discovery server. |
-| `mac/OMTDiscoveryDnsSd.cs` | 437 | D | reference | macOS/iOS: DNS-SD browse, resolve, register; builds the TXT record (`:248`). Main evidence for what goes in the mDNS records. |
+| `mac/OMTDiscoveryDnsSd.cs` | 437 | D | reference | macOS/iOS: DNS-SD browse, resolve, register. Registers with no TXT data (`:270`); `CreateTXTRecord` (`:248`) is unused. |
 | `win32/OMTDiscoveryWin32.cs` | 525 | D | reference | Windows: DnsApi browse/register; runs `MDNSClient` alongside. Second opinion on record content. |
 | `linux/OMTDiscoveryAvahi.cs` | 292 | D | reference | Linux: Avahi browse, resolve, register. Third opinion. |
 | `mdns/MDNSClient.cs` | 232 | D | reference | Hand-built mDNS PTR query for `_omt._tcp.local` every 8 s on 224.0.0.251 and ff02::fb, to work around Windows DNS-SD going quiet. Tells us which query real receivers send. |
@@ -188,9 +189,9 @@ OMT Signal Generator (Windows), and MikanseiLaboratory's community tools.
 
 ## Open questions for stage 1
 
-1. Does the TXT record carry anything a receiver depends on, and do the three
-   platform back ends agree?
-2. Does `vmx-codec` implement the preview (1/8) encode and decode that OMT preview mode uses?
-3. How much has the frame layout changed across the tags `v1.0.0.3`…`v1.0.0.19`?
-   `git log -p -- src/OMTFrame.cs src/OMTMetadata.cs` will tell.
-4. Given the community crate, what is this crate for? (See above.)
+Answered in [`PROTOCOL.md`](PROTOCOL.md) and [`COMPARISON.md`](COMPARISON.md):
+
+1. TXT records: none on any platform (D5).
+2. `vmx-codec` already has preview length and preview decode (§6.2).
+3. Frame layout history across tags: not yet examined.
+4. The community crate: we build our own and use it as a cross-check (`COMPARISON.md`).

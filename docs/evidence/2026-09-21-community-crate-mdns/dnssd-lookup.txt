@@ -1,0 +1,5 @@
+Lookup LOCALHOST (Colorbars)._omt._tcp.local
+DATE: ---Mon 21 Sep 2026---
+12:37:25.118  ...STARTING...
+12:37:25.119  LOCALHOST\032(Colorbars)._omt._tcp.local. can be reached at LOCALHOST.local.:6400 (interface 14) Flags: 1
+12:37:25.119  LOCALHOST\032(Colorbars)._omt._tcp.local. can be reached at LOCALHOST.local.:6400 (interface 14)
