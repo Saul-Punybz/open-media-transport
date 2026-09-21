@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 21 Sep 2026 — first captures of real libomtnet; spec partly confirmed.
+**Last updated:** 21 Sep 2026 — our receiver works against a libomtnet sender (loopback).
 
 ## RESUME HERE
 
@@ -15,10 +15,11 @@ Public repo `Saul-Punybz/open-media-transport`, licensed MIT OR Apache-2.0.
 |---|---|---|
 | `vmx-codec` | The OMT video codec, a safe-Rust port of `libvmx` | **Done.** Byte-identical to the C++ reference both ways, at any thread count. Conformance tests build upstream at `544bcfb`. |
 | `libvmx-ref` | Builds the upstream C++ reference | Test-only. |
-| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Wire format only**: frame headers, commands, a size-limited deframer. 22 tests; 4 of them use bytes captured from real libomtnet, and our receiver handshake is byte-identical to its. No networking yet. |
+| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Wire format + minimal receiver.** Received from a real libomtnet sender with pixels identical to libomtnet's own receiver (`docs/INTEROP.md`). No discovery, no sender, no reconnect yet. 24 tests, 4 on captured bytes. |
 
-**What is NOT true yet, and must not be claimed:** nothing has ever talked to a real
-OMT device or application (not vMix, not OBS, not the Raspberry Pi encoder). Matching
+**What is NOT true yet, and must not be claimed:** nothing has talked to vMix, OBS or
+the Raspberry Pi devices. Our receiver has talked to libomtnet itself, on one Mac, over
+loopback (`docs/INTEROP.md`) — that is the whole of our interop evidence. Matching
 the reference implementation's bytes proves the codec; it is not a live handshake.
 `vmx-codec` has no SIMD, so it encodes 2.2x-3.2x slower than the C reference
 (`crates/vmx-codec/BENCH.md`) — one core still does 1080p60 at OMT's default quality.
@@ -48,10 +49,10 @@ Rebuild recipe (outputs to a scratch dir, never into the repo):
 then `dotnet build interop/libomtnet-harness -c Release -p:LibVmx=$OUT/libvmx.dylib -o $OUT/harness`.
 Use `tshark ... -a duration:N` — it ignores SIGALRM.
 
-**Next step:** discovery (stage 2): announce and browse `_omt._tcp` with a maintained
-mDNS crate (check `mdns-sd` first), using the real OS host name (`PROTOCOL.md` D3), with
-`dns-sd`/`tshark` output kept under `docs/evidence/`. The wire format in
-`crates/open-media-transport` still needs confirming against a real sender.
+**Next step:** discovery (stage 2) so our receiver can find sources by name: browse and
+announce `_omt._tcp` with a maintained mDNS crate (check `mdns-sd` first), real OS host
+name (D3), evidence with `dns-sd`/`tshark`. Then the sender (stage 4), tested against the
+libomtnet harness receiver the same way.
 
 ## House rules
 

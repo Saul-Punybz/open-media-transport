@@ -13,10 +13,11 @@
 //!
 //! ## Status
 //!
-//! Only the wire format exists so far: frame headers ([`frame`]), protocol
-//! commands ([`command`]) and an incremental frame parser ([`Deframer`]).
-//! There is no networking or discovery yet, and **nothing here has been
-//! tested against another implementation**.
+//! The wire format — frame headers ([`frame`]), protocol commands
+//! ([`command`]), an incremental frame parser ([`Deframer`]) — and a minimal
+//! blocking [`receiver`]. No discovery and no sender yet. The receiver
+//! handshake is byte-identical to libomtnet's (`tests/captured.rs`); nothing
+//! has been tested against vMix, OBS or other OMT products.
 //!
 //! ## The wire format in one paragraph
 //!
@@ -48,6 +49,7 @@
 pub mod command;
 mod deframer;
 pub mod frame;
+pub mod receiver;
 
 pub use deframer::{Deframer, Limits, OwnedFrame};
 

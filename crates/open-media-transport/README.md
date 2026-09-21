@@ -5,17 +5,18 @@ A pure-Rust implementation of the
 live video, audio and metadata over a local network, the job NDI does, under
 the MIT license. Video uses the [`vmx-codec`](../vmx-codec) crate.
 
-**Early work.** What exists today is the wire format only:
+**Early work.** What exists today:
 
 - `frame` — the 16-byte frame header and the video/audio extended headers
 - `command` — the fixed protocol commands, byte for byte, and a classifier for
   incoming metadata
 - `Deframer` — splits a TCP byte stream into frames, with explicit size limits;
   a malformed peer produces an error instead of a stalled connection
+- `receiver` — a minimal blocking receiver that connects the way libomtnet does
 
-No networking, no discovery, and **no testing against another implementation
-yet**. Nothing here claims to interoperate with vMix, OBS or libomtnet until
-`docs/INTEROP.md` says so.
+The receiver has been run against a libomtnet sender and decoded the same pixels
+as libomtnet's own receiver; see `docs/INTEROP.md` for exactly what was tested.
+No discovery, no sender yet, and nothing tested against vMix or OBS.
 
 The protocol is implemented from [`docs/PROTOCOL.md`](../../docs/PROTOCOL.md),
 which describes what the reference implementation,

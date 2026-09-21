@@ -1,0 +1,11 @@
+# sort | comm of the 'pixels' lines from both receivers
+## only libomtnet
+## only ours
+pixels <HarnessFrame N=\x22120\x22 />\x00 fnv1a64=9bce0f7d66609e3a stride=1280
+## both (identical hash)
+pixels <HarnessFrame N=\x22150\x22 />\x00 fnv1a64=143f961a4463856e stride=1280
+pixels <HarnessFrame N=\x22180\x22 />\x00 fnv1a64=e1d3522ba9bfa171 stride=1280
+pixels <HarnessFrame N=\x22210\x22 />\x00 fnv1a64=422a59724576bde3 stride=1280
+pixels <HarnessFrame N=\x22240\x22 />\x00 fnv1a64=400d76637078870e stride=1280
+pixels <HarnessFrame N=\x22270\x22 />\x00 fnv1a64=6df99b0516e62811 stride=1280
+pixels <HarnessFrame N=\x22300\x22 />\x00 fnv1a64=7ab4b3dfb8c81b87 stride=1280

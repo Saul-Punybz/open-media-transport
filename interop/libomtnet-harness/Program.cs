@@ -124,6 +124,8 @@ static class Program
                 case OMTFrameType.Video:
                     if (video++ % 30 == 0 || fm != "")
                         Console.WriteLine($"recv video ts={frame.Timestamp} {frame.Width}x{frame.Height} codec={FourCC(frame.Codec)} flags={(int)frame.Flags} cs={(int)frame.ColorSpace} rate={frame.FrameRateN}/{frame.FrameRateD} compressed={frame.CompressedLength} meta=\"{fm}\"");
+                    if (fm != "" && frame.DataLength > 0)
+                        Console.WriteLine($"pixels {fm} fnv1a64={Fnv1a64(frame.Data, frame.DataLength):x16} stride={frame.Stride}");
                     break;
                 case OMTFrameType.Audio:
                     if (audio++ % 30 == 0)
@@ -167,6 +169,16 @@ static class Program
         var buf = new float[samples * 2];
         for (int i = 0; i < samples; i++) buf[i] = (float)Math.Sin(2 * Math.PI * 1000 * (n * samples + i) / 48000.0) * 0.25f;
         Marshal.Copy(buf, 0, dst, buf.Length); // channel 1 (right) left as zeros
+    }
+
+    // FNV-1a 64 of the decoded pixels, to compare with other receivers.
+    static ulong Fnv1a64(IntPtr p, int len)
+    {
+        var b = new byte[len];
+        Marshal.Copy(p, b, 0, len);
+        ulong h = 0xcbf29ce484222325;
+        foreach (byte x in b) { h ^= x; h *= 0x100000001b3; }
+        return h;
     }
 
     static string FourCC(int c) => Encoding.ASCII.GetString(BitConverter.GetBytes(c));

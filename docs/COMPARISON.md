@@ -55,8 +55,9 @@ nobody has yet: neither crate has ever been shown to talk to libomtnet, vMix or 
 1. **Interop evidence, kept in the repo.** Started: libomtnet against itself is
    captured in `evidence/2026-09-21-libomtnet-loopback`, and our receiver handshake
    is byte-identical to libomtnet's (`crates/open-media-transport/tests/captured.rs`).
-   Still to come: `tshark` captures and a written matrix (`INTEROP.md`, stage 5) of
-   our code against libomtnet, OBS with the OMT plugin, vMix's
+   Our receiver against a libomtnet sender is the first row of
+   [`INTEROP.md`](INTEROP.md): same decoded pixels as libomtnet's own receiver.
+   Still to come: the rest of the matrix — our sender, and our code against OBS with the OMT plugin, vMix's
    free OMT tools, SIENNA's macOS tools, and a Pi. This is the single largest gap in
    the community crate and the thing the README can point to.
 2. **A conformance harness against real upstream code.** The same idea that made

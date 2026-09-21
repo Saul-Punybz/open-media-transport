@@ -28,6 +28,9 @@ dependencies = [
 [[package]]
 name = "open-media-transport"
 version = "0.1.0"
+dependencies = [
+ "vmx-codec",
+]
 
 [[package]]
 name = "shlex"

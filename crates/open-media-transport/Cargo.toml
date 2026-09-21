@@ -11,3 +11,6 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+vmx-codec = { path = "../vmx-codec" }
