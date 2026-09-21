@@ -7,7 +7,7 @@ live video over a local network with low latency, the same job NDI does.
 | Crate | What it is | Status |
 |---|---|---|
 | [`vmx-codec`](crates/vmx-codec) | VMX, the OMT video codec. A safe-Rust port of [libvmx](https://github.com/openmediatransport/libvmx). | Codec core ported. Output is byte-identical to libvmx. |
-| `open-media-transport` | Protocol: discovery, sending and receiving. A port of [libomtnet](https://github.com/openmediatransport/libomtnet). | Not started. |
+| [`open-media-transport`](crates/open-media-transport) | Protocol: discovery, sending and receiving, implemented from [`docs/PROTOCOL.md`](docs/PROTOCOL.md), a cited description of [libomtnet](https://github.com/openmediatransport/libomtnet). | Wire format only. Not yet tested against any other implementation. |
 | `libvmx-ref` (unpublished) | Builds the upstream C++ libvmx, used only by the conformance tests and the benchmark. | Test-only. |
 
 ## Development
@@ -17,6 +17,7 @@ live video over a local network with low latency, the same job NDI does.
 git clone --depth 1 https://github.com/openmediatransport/libvmx reference/libvmx
 
 cargo test -p vmx-codec
+cargo test -p open-media-transport
 cargo clippy --all-targets -- -D warnings
 ```
 

@@ -1,0 +1,13 @@
+[package]
+name = "open-media-transport"
+version = "0.1.0"
+description = "Pure-Rust implementation of the Open Media Transport (OMT) protocol"
+readme = "README.md"
+keywords = ["video", "omt", "broadcast", "streaming", "network"]
+categories = ["multimedia::video", "network-programming"]
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]

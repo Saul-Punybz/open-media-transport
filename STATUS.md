@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 21 Sep 2026 — stage 1 spec written (`docs/PROTOCOL.md`).
+**Last updated:** 21 Sep 2026 — spec written; crate started with the wire format.
 
 ## RESUME HERE
 
@@ -15,7 +15,7 @@ Public repo `Saul-Punybz/open-media-transport`, licensed MIT OR Apache-2.0.
 |---|---|---|
 | `vmx-codec` | The OMT video codec, a safe-Rust port of `libvmx` | **Done.** Byte-identical to the C++ reference both ways, at any thread count. Conformance tests build upstream at `544bcfb`. |
 | `libvmx-ref` | Builds the upstream C++ reference | Test-only. |
-| `open-media-transport` | The protocol: discovery, sending, receiving. A port of `libomtnet` (C#, ~10.6K lines) | **Not started — this is the work.** |
+| `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Wire format only**: frame headers, commands, a size-limited deframer; 18 tests, all self-consistency. No networking yet. |
 
 **What is NOT true yet, and must not be claimed:** nothing has ever talked to a real
 OMT device or application (not vMix, not OBS, not the Raspberry Pi encoder). Matching
@@ -39,8 +39,10 @@ Caudal does not speak OMT; that integration is Caudal's M12 and comes after this
 **Blocked on a tool:** confirming the spec needs libomtnet running here, which needs the
 .NET SDK (not installed). Alternatives: vMix/SIENNA free OMT tools, OBS + plugin, a Pi.
 
-**Next step:** the `open-media-transport` crate, starting with the wire format
-(`PROTOCOL.md` §3–4), then discovery (stage 2) with a `tshark` capture as evidence.
+**Next step:** discovery (stage 2): announce and browse `_omt._tcp` with a maintained
+mDNS crate (check `mdns-sd` first), using the real OS host name (`PROTOCOL.md` D3), with
+`dns-sd`/`tshark` output kept under `docs/evidence/`. The wire format in
+`crates/open-media-transport` still needs confirming against a real sender.
 
 ## House rules
 

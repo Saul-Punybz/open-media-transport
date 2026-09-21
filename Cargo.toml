@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/vmx-codec", "crates/libvmx-ref"]
+members = ["crates/vmx-codec", "crates/libvmx-ref", "crates/open-media-transport"]
 
 [workspace.package]
 edition = "2021"
