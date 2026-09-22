@@ -2,3 +2,4 @@
 /reference/
 *.profraw
 .DS_Store
+/dist/
