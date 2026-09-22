@@ -12,8 +12,10 @@ source, printing statistics and saving a snapshot.
 
 ## 1. Get `omt`
 
-**Download** (when a release is published): pick the archive for your system from the
-repository's *Releases* page, unpack it, and run `omt` from a terminal.
+**Download**: pick the archive for your system from the
+[latest release](https://github.com/Saul-Punybz/open-media-transport/releases/latest)
+(v0.1.0: [releases/tag/v0.1.0](https://github.com/Saul-Punybz/open-media-transport/releases/tag/v0.1.0)),
+unpack it, and run `omt` from a terminal. The release notes list SHA-256 checksums.
 
 - macOS: the binary is not signed. If macOS refuses to open it, run
   `xattr -d com.apple.quarantine ./omt` once.

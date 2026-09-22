@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 21 Sep 2026 — `omt` CLI and TESTING.md: ready for outside testers (build from source).
+**Last updated:** 22 Sep 2026 — v0.1.0 published as a pre-release on GitHub; waiting for tester reports.
 
 ## RESUME HERE
 
@@ -65,7 +65,10 @@ code builds and its unit/loopback tests pass there, not that it interoperates th
 **v0.1.0 tagged (21 Sep 2026)** with the maintainer's go-ahead. `release.yml` built `omt` for
 aarch64/x86_64 macOS, x86_64 Linux and x86_64 Windows into a **draft** release. The macOS
 arm64 archive, downloaded from that draft, was run against libomtnet both ways and works;
-the other three archives have not been run. Publishing the draft is the maintainer's call. `release.yml` builds `omt` for four targets into a
+the other three archives have not been run. **Published 22 Sep 2026 as a pre-release**
+(maintainer's request): https://github.com/Saul-Punybz/open-media-transport/releases/tag/v0.1.0 —
+confirmed downloadable without authentication; archive checksums in the release notes and in
+the local `dist/v0.1.0/SHA256SUMS`. `release.yml` builds `omt` for four targets into a
 **draft** GitHub release when a `v*` tag is pushed.
 
 **Next step:** get reports from real products (`TESTING.md` §3) and record them in
