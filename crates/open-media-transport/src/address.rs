@@ -190,13 +190,13 @@ impl Table {
 /// another port or address, the entry is replaced, so looking the name up
 /// again finds where it is now. Share one directory among receivers with an
 /// `Arc`; each one built with [`Directory::browse`] runs its own mDNS
-/// responder.
+/// responder, while [`Directory::with_shared`] uses one shared with others.
 pub struct Directory {
     table: Arc<Table>,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
     // Dropped after the browse thread has been joined.
-    _discovery: Option<Discovery>,
+    _discovery: Option<Arc<Discovery>>,
 }
 
 impl Directory {
@@ -209,6 +209,11 @@ impl Directory {
     /// [`Discovery::with_server`] to find sources through a discovery server
     /// (§10) as well as, or instead of, DNS-SD.
     pub fn with_discovery(discovery: Discovery) -> Result<Directory, discovery::Error> {
+        Directory::with_shared(Arc::new(discovery))
+    }
+
+    /// Browses with a [`Discovery`] shared with senders or other directories.
+    pub fn with_shared(discovery: Arc<Discovery>) -> Result<Directory, discovery::Error> {
         let browser = discovery.browse()?;
         let table = Arc::new(Table::default());
         let stop = Arc::new(AtomicBool::new(false));
