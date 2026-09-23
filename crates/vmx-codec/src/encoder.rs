@@ -5,6 +5,7 @@ use crate::convert::{frame_to_planes16, frame_to_planes8, Planes, FILL16, FILL8}
 use crate::dct::QuantTables;
 use crate::frame::{Frame, PixelFormat};
 use crate::layout::{quality_preset, write, Layout};
+use crate::simd::Native;
 use crate::slice::{encode_plane, level_shift, Sample};
 use crate::tables::{BITRATE_TABLE, MAX_QUALITY, QUALITY_COUNT, SLICE_HEIGHT};
 use crate::Error;
@@ -259,7 +260,7 @@ fn encode_one_slice<T: Sample>(
     for p in 0..nplanes {
         let stride = pl.strides[p];
         let rows = &pl.data[p][s * SLICE_HEIGHT * stride..(s + 1) * SLICE_HEIGHT * stride];
-        encode_plane(rows, stride, level_shift(p, T::DEPTH), matrix, dc_shift, &mut dc, &mut ac);
+        encode_plane::<T, Native>(rows, stride, level_shift(p, T::DEPTH), matrix, dc_shift, &mut dc, &mut ac);
     }
     (dc.into_bytes(), ac.into_bytes())
 }

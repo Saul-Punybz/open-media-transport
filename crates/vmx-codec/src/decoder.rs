@@ -5,6 +5,7 @@ use crate::convert::{planes16_to_frame, planes8_to_frame, Planes, FILL16, FILL8}
 use crate::dct::{Depth, QuantTables};
 use crate::frame::{Frame, Plane, PixelFormat};
 use crate::layout::{parse, quality_preset, Layout};
+use crate::simd::Native;
 use crate::slice::{decode_plane, decode_plane_preview, level_shift, DecodeOut, Sample};
 use crate::tables::{QUALITY_COUNT, SLICE_HEIGHT};
 use crate::Error;
@@ -180,7 +181,7 @@ fn decode_one_slice<T: Sample + DecodeOut>(
     let mut dc = BitReader::new(dc);
     let mut ac = BitReader::new(ac);
     for (p, r) in rows.iter_mut().enumerate() {
-        decode_plane(r, strides[p], level_shift(p, T::DEPTH), matrix, dc_shift, &mut dc, &mut ac)
+        decode_plane::<T, Native>(r, strides[p], level_shift(p, T::DEPTH), matrix, dc_shift, &mut dc, &mut ac)
             .map_err(|Corrupt| Error::InvalidBitstream("corrupt slice stream"))?;
     }
     Ok(())

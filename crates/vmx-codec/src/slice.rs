@@ -16,9 +16,10 @@
 //!
 //! Both streams are padded with zero bits to a byte boundary after each plane.
 
-use crate::bits::{from_code, to_code, BitReader, BitWriter, Corrupt};
+use crate::bits::{from_code, to_code, AcCursor, AcSymbol, BitReader, BitWriter, Corrupt};
 use crate::dct::{broadcast_dc8, fdct_quant_zig, idct16, idct8, Depth};
-use crate::lanes::V16;
+use crate::lanes::Isa;
+use crate::tables::ZIGZAG;
 
 /// A sample type the planes can hold.
 pub(crate) trait Sample: Copy + Send + Sync {
@@ -57,68 +58,81 @@ pub(crate) fn level_shift(p: usize, depth: Depth) -> i16 {
 
 /// Encodes one plane of one slice. `rows` holds the 16 slice rows of the
 /// plane (`16 * stride` samples).
-pub(crate) fn encode_plane<T: Sample>(
+pub(crate) fn encode_plane<T: Sample, S: Isa>(
     rows: &[T],
     stride: usize,
     shift: i16,
     matrix: &[u16; 192],
     dc_shift: u32,
-    dc: &mut BitWriter,
-    ac: &mut BitWriter,
+    dc_out: &mut BitWriter,
+    ac_out: &mut BitWriter,
 ) {
+    // Local accumulators stay in registers; see `BitAcc`.
+    let (mut dc, mut ac) = (dc_out.acc, ac_out.acc);
+    let (dcv, acv) = (&mut dc_out.buf, &mut ac_out.buf);
     let dc_round: i16 = if dc_shift > 0 { 1 << (dc_shift - 1) } else { 0 };
     let mut dc_pred: i16 = 0;
     let mut run: u32 = 0;
     for by in 0..2 {
         let base = by * 8 * stride;
         for bx in (0..stride).step_by(8) {
-            let mut block: [V16; 8] = [[0; 8]; 8];
+            let mut block = [[0i16; 8]; 8];
             for (k, row) in block.iter_mut().enumerate() {
                 let src = &rows[base + k * stride + bx..base + k * stride + bx + 8];
                 for (d, s) in row.iter_mut().zip(src) {
                     *d = s.lane();
                 }
             }
-            let zz = fdct_quant_zig(&block, T::DEPTH, matrix, -shift);
+            let zz = fdct_quant_zig::<S>(&block, T::DEPTH, matrix, -shift);
+            dc.reserve(dcv);
+            ac.reserve(acv);
+            let (dcb, acb) = (&mut dcv[..], &mut acv[..]);
 
             let d = zz[0].wrapping_add(dc_round) >> dc_shift;
             let diff = d as i32 - dc_pred as i32;
             if diff == 0 {
-                dc.put(0b11, 2);
+                dc.put(0b11, 2, dcb);
             } else {
-                dc.put_value(to_code(diff));
+                dc.put_value(to_code(diff), dcb);
             }
             dc_pred = d;
 
-            // The DC slot counts as a zero in the AC sequence.
-            run += 1;
-            for &c in &zz[1..] {
-                if c == 0 {
-                    run += 1;
-                } else {
-                    ac.put_run(run);
-                    ac.put_value(to_code(c as i32));
-                    run = 0;
-                }
+            // Walk the non-zero coefficients only, as libvmx does with its
+            // movemask + tzcnt loop. The DC slot (bit 0) counts as a zero in
+            // the AC sequence.
+            let mut nz = S::nonzero_mask(&zz) & !1;
+            let mut pos = 0;
+            while nz != 0 {
+                let i = nz.trailing_zeros();
+                run += i - pos;
+                ac.put_run_value(run, to_code(zz[i as usize] as i32), acb);
+                run = 0;
+                pos = i + 1;
+                nz &= nz - 1;
             }
+            run += 64 - pos;
         }
     }
-    ac.put_run(run);
-    ac.align();
-    dc.align();
+    ac.reserve(acv);
+    ac.put_run(run, acv);
+    ac.align(acv);
+    dc.align(dcv);
+    (dc_out.acc, ac_out.acc) = (dc, ac);
 }
 
 /// Decodes one plane of one slice into `rows` (`16 * stride` samples).
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn decode_plane<T: Sample + DecodeOut>(
+pub(crate) fn decode_plane<T: Sample + DecodeOut, S: Isa>(
     rows: &mut [T],
     stride: usize,
     shift: i16,
     matrix: &[u16; 64],
     dc_shift: u32,
-    dc: &mut BitReader,
-    ac: &mut BitReader,
+    dc_in: &mut BitReader,
+    ac_in: &mut BitReader,
 ) -> Result<(), Corrupt> {
+    // Local copies keep the read state in registers.
+    let (mut dc, mut ac) = (*dc_in, AcCursor::new(*ac_in));
     let mut dc_pred: i16 = 0;
     let mut pending: u64 = 0;
     for by in 0..2 {
@@ -126,17 +140,14 @@ pub(crate) fn decode_plane<T: Sample + DecodeOut>(
         for bx in (0..stride).step_by(8) {
             let mut block = [0i16; 64];
             let has_ac = pending < 64;
+            // Coefficients go straight to their natural (de-zig-zagged) slot.
             while pending < 64 {
-                if ac.bit() == 1 {
-                    if ac.bit() == 1 {
+                match ac.ac_symbol()? {
+                    AcSymbol::Run(n) => pending += n,
+                    AcSymbol::Value(v) => {
+                        block[ZIGZAG[pending as usize]] = from_code(v);
                         pending += 1;
-                    } else {
-                        pending += ac.code_tail()?;
                     }
-                } else {
-                    let v = ac.code_tail()?;
-                    block[pending as usize] = from_code(v);
-                    pending += 1;
                 }
             }
             pending -= 64;
@@ -150,24 +161,40 @@ pub(crate) fn decode_plane<T: Sample + DecodeOut>(
             block[0] = block[0].wrapping_add(dc_pred);
             dc_pred = block[0];
 
-            T::write_block(&block, has_ac, matrix, &mut rows[base + bx..], stride, shift);
+            T::write_block::<S>(&block, has_ac, matrix, &mut rows[base + bx..], stride, shift);
         }
     }
+    let mut ac = ac.reader();
     ac.align();
     dc.align();
+    (*dc_in, *ac_in) = (dc, ac);
     Ok(())
 }
 
 /// Writes one reconstructed block (depth-specific).
 pub(crate) trait DecodeOut: Sized {
-    fn write_block(block: &[i16; 64], has_ac: bool, matrix: &[u16; 64], dst: &mut [Self], stride: usize, shift: i16);
+    fn write_block<S: Isa>(
+        block: &[i16; 64],
+        has_ac: bool,
+        matrix: &[u16; 64],
+        dst: &mut [Self],
+        stride: usize,
+        shift: i16,
+    );
 }
 
 impl DecodeOut for u8 {
     #[inline(always)]
-    fn write_block(block: &[i16; 64], has_ac: bool, matrix: &[u16; 64], dst: &mut [u8], stride: usize, shift: i16) {
+    fn write_block<S: Isa>(
+        block: &[i16; 64],
+        has_ac: bool,
+        matrix: &[u16; 64],
+        dst: &mut [u8],
+        stride: usize,
+        shift: i16,
+    ) {
         if has_ac {
-            idct8(block, matrix, dst, stride, shift);
+            idct8::<S>(block, matrix, dst, stride, shift);
         } else {
             broadcast_dc8(block[0], dst, stride, shift);
         }
@@ -176,9 +203,16 @@ impl DecodeOut for u8 {
 
 impl DecodeOut for u16 {
     #[inline(always)]
-    fn write_block(block: &[i16; 64], _has_ac: bool, matrix: &[u16; 64], dst: &mut [u16], stride: usize, shift: i16) {
+    fn write_block<S: Isa>(
+        block: &[i16; 64],
+        _has_ac: bool,
+        matrix: &[u16; 64],
+        dst: &mut [u16],
+        stride: usize,
+        shift: i16,
+    ) {
         // libvmx always runs the full inverse transform on 10-bit planes.
-        idct16(block, matrix, dst, stride, shift);
+        idct16::<S>(block, matrix, dst, stride, shift);
     }
 }
 

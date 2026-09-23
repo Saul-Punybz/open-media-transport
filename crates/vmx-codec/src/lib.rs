@@ -48,7 +48,8 @@
 //! [`PixelFormat::P216`] / [`PixelFormat::Pa16`] and 8-bit streams to any
 //! other decodable format.
 
-#![forbid(unsafe_code)]
+// `unsafe` is confined to `simd` (std::arch intrinsics); see that module.
+#![deny(unsafe_code)]
 #![warn(missing_docs)]
 
 mod bits;
@@ -59,6 +60,8 @@ mod encoder;
 mod frame;
 mod lanes;
 mod layout;
+#[allow(unsafe_code)]
+mod simd;
 mod slice;
 mod tables;
 
