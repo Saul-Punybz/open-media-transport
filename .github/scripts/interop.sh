@@ -7,11 +7,12 @@
 # 1. libomtnet sends, omt receives   (by omt://127.0.0.1:PORT)
 # 2. omt sends, libomtnet receives   (by omt://127.0.0.1:PORT)
 # 3. and 4. the same by full source name, found through our discovery server
-#    (`omt discovery-server`) instead of mDNS, which CI runners do not
-#    reliably provide. libomtnet is pointed at it with its settings.xml
-#    (OMTSettings.cs:41, OMTDiscovery.cs:56).
+#    (`omt discovery-server`) instead of mDNS. libomtnet is pointed at it
+#    with its settings.xml (OMTSettings.cs:41, OMTDiscovery.cs:56).
+# 5. and 6. by full source name over mDNS. Informational only: multicast on
+#    CI runners is not something to gate on.
 #
-# Fails unless frames arrive in every case.
+# Fails unless frames arrive in cases 1-4.
 set -euo pipefail
 omt=$1 harness=$2 logs=$3
 mkdir -p "$logs"
@@ -34,6 +35,13 @@ check() { # name, command...
   local name=$1; shift
   if "$@"; then echo "PASS $name"; echo "| $name | pass |" >> "$logs/summary.md"
   else echo "FAIL $name"; echo "| $name | **FAIL** |" >> "$logs/summary.md"; fail=1; fi
+}
+
+# As check, but a failure is recorded without failing the run.
+inform() { # name, command...
+  local name=$1; shift
+  if "$@"; then echo "PASS $name"; echo "| $name | pass |" >> "$logs/summary.md"
+  else echo "FAIL (informational) $name"; echo "| $name | fail (informational) |" >> "$logs/summary.md"; fi
 }
 
 # omt recv printed video and audio with sound and never failed to decode.
@@ -76,7 +84,7 @@ sleep 1
 # libomtnet reads DiscoveryServer from settings.xml in OMT_STORAGE_PATH on
 # Linux (LinuxPlatform.cs:67-72) and in %ProgramData%\OMT on Windows
 # (Win32Platform.cs:55-58).
-if [ "${RUNNER_OS:-}" = Windows ]; then store="$(cygpath -u "$PROGRAMDATA")/OMT"; else store="$logs/omt-storage"; export OMT_STORAGE_PATH="$store"; fi
+if [ "${RUNNER_OS:-}" = Windows ]; then store=/c/ProgramData/OMT; else store="$logs/omt-storage"; export OMT_STORAGE_PATH="$store"; fi
 mkdir -p "$store"
 printf '<Settings><DiscoveryServer>omt://127.0.0.1:6399</DiscoveryServer></Settings>\n' > "$store/settings.xml"
 
@@ -96,6 +104,26 @@ grep -v "^log:" "$logs/4-harness-recv.log" || true
 check "omt send -> libomtnet recv (\"$name\" via discovery server)" harness_received "$logs/4-harness-recv.log"
 rm -f "$store/settings.xml"
 cat "$logs/ds.log"
+
+echo "== 5./6. by name over mDNS (informational)"
+dotnet "$harness" send "ci-harness-mdns-$tag" 25 > "$logs/5-harness-send.log" 2>&1 & pids+=($!)
+name=$(wait_for "$logs/5-harness-send.log" '^send address=' | sed -E 's/^send address=(.*) url=.*/\1/')
+echo "harness source: $name"
+"$omt" list --seconds 5 > "$logs/5-omt-list.log" 2>&1 || true
+cat "$logs/5-omt-list.log"
+"$omt" recv "$name" --seconds 8 > "$logs/5-omt-recv.log" 2>&1 || true
+cat "$logs/5-omt-recv.log"
+inform "libomtnet send -> omt recv (\"$name\" via mDNS)" omt_received "$logs/5-omt-recv.log"
+
+"$omt" send --name "ci-omt-mdns-$tag" --size 640x360 --seconds 25 > "$logs/6-omt-send.log" 2>&1 & pids+=($!)
+name=$(wait_for "$logs/6-omt-send.log" '^sending ' | sed -E 's/^sending "(.*)" on port.*/\1/')
+echo "omt source: $name"
+sleep 2
+dotnet "$harness" list 5 > "$logs/6-harness-list.log" 2>&1 || true
+grep -v "^log:" "$logs/6-harness-list.log" || true
+dotnet "$harness" recv "$name" 8 > "$logs/6-harness-recv.log" 2>&1 || true
+grep -v "^log:" "$logs/6-harness-recv.log" || true
+inform "omt send -> libomtnet recv (\"$name\" via mDNS)" harness_received "$logs/6-harness-recv.log"
 
 cat "$logs/summary.md"
 exit $fail

@@ -69,7 +69,8 @@ jobs:
           file "$bin" || true
           case "${{ matrix.target }}" in
             *linux*) if file "$bin" | grep -q "dynamically linked"; then echo "::error::not static"; exit 1; fi;;
-            *windows*) if command -v dumpbin >/dev/null; then dumpbin //dependents "$bin"; fi;;
+            # Static CRT: no import of the Visual C++ runtime DLLs.
+            *windows*) if grep -aqi "vcruntime140" "$bin"; then echo "::error::links vcruntime140.dll"; exit 1; fi;;
             *darwin*) otool -L "$bin"; otool -l "$bin" | grep -A4 -E "LC_BUILD_VERSION|LC_VERSION_MIN" | grep -E "minos|version" || true;;
           esac
           if [ "${{ matrix.target }}" = x86_64-apple-darwin ] && ! arch -x86_64 /usr/bin/true 2>/dev/null; then

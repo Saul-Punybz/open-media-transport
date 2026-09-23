@@ -58,6 +58,16 @@ jobs:
                            $src/vmxcodec_x86.cpp $src/vmxcodec_avx2.cpp $src/vmxcodec.cpp -o out/libvmx.dll ;;
           esac
           ls -l out
+      # libomtnet's Linux discovery needs a running avahi-daemon: without one
+      # it passes a null client on to avahi_service_browser_new
+      # (OMTDiscoveryAvahi.cs:86-91) and libavahi-client aborts the process,
+      # even when a discovery server is configured.
+      - name: Start avahi-daemon
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q && sudo apt-get install -yq avahi-daemon
+          sudo systemctl start avahi-daemon
+          systemctl is-active avahi-daemon
       - name: Build libomtnet harness
         run: |
           dotnet build interop/libomtnet-harness -c Release -o out/harness -nologo -v q
@@ -99,7 +109,7 @@ jobs:
       - name: Fuzz ${{ matrix.target }} for 60 s
         working-directory: crates/open-media-transport
         shell: bash
-        run: cargo fuzz run ${{ matrix.target }} -- -max_total_time=60 2>&1 | tail -25
+        run: cargo fuzz run --target x86_64-unknown-linux-gnu ${{ matrix.target }} -- -max_total_time=60 2>&1 | tail -25
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
