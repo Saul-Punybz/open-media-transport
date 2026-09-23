@@ -1,0 +1,23 @@
+log: 9/23/2026 10:47:40 AM,[OMTLogging],Log Started
+log: 9/23/2026 10:47:40 AM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/23/2026 10:47:40 AM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/23/2026 10:47:40 AM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+log: 9/23/2026 10:47:40 AM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+log: 9/23/2026 10:47:40 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 10:47:40 AM,[OMTDiscovery],New: SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-encoded):6400
+log: 9/23/2026 10:47:40 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-encoded):6400,192.168.95.8
+log: 9/23/2026 10:47:40 AM,[OMTReceive.Connect],Connected.Video: omt://127.0.0.1:6400
+log: 9/23/2026 10:47:40 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 10:47:40 AM,[OMTReceive.Connect],Connected.Audio: omt://127.0.0.1:6400
+recv video ts=122666544 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53565 meta=""
+recv video ts=129999870 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53685 meta="<HarnessFrame N=\x22390\x22 />\x00"
+recv video ts=132666534 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53648 meta=""
+recv video ts=139999860 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53619 meta="<HarnessFrame N=\x22420\x22 />\x00"
+recv video ts=142666524 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53618 meta=""
+recv video ts=149999850 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53657 meta="<HarnessFrame N=\x22450\x22 />\x00"
+recv video ts=152666514 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53597 meta=""
+recv video ts=159999840 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53548 meta="<HarnessFrame N=\x22480\x22 />\x00"
+recv video ts=162666504 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53554 meta=""
+recv video ts=169999830 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53561 meta="<HarnessFrame N=\x22510\x22 />\x00"
+recv video ts=172666494 640x360 codec=VMX1 flags=0 cs=709 rate=30/1 compressed=53561 meta=""
+recv done video=151 audio=0 info=none

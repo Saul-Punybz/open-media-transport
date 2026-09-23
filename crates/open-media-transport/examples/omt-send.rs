@@ -106,7 +106,8 @@ fn main() {
             *s = ((2.0 * std::f64::consts::PI * 1000.0 * t).sin() * 0.25) as f32;
         }
         let ts = audio_clock.audio(RATE as i32, samples as i32);
-        tx.send_audio(&audio, 2, RATE as i32, ts, b"");
+        tx.send_audio(&audio, 2, RATE as i32, ts, b"")
+            .expect("audio");
 
         let t = tx.tally();
         if t != last_tally {

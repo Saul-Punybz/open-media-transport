@@ -35,10 +35,14 @@
 //! reconnects for nothing and, having created its redirect state without a
 //! side connection, ignores every later redirect (`OMTReceive.cs:579-594`,
 //! `OMTRedirect.cs:84-90`). Here an empty first redirect is a no-op.
+//!
+//! **Dropping** a receiver shuts its sockets down and waits at most
+//! [`DROP_TIMEOUT`] for its threads; one still busy after that (say, in a
+//! connection attempt) finishes on its own and closes what it opened.
 
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -47,6 +51,8 @@ use crate::address::{Address, Directory};
 use crate::command::{classify, Command, Message, Quality, Tally};
 use crate::frame::ExtendedHeader;
 use crate::redirect::{self, Watcher};
+use crate::sender::join_bounded;
+pub use crate::sender::DROP_TIMEOUT;
 use crate::{frame, Deframer, Error, Limits, OwnedFrame};
 
 /// Minimum time between connection attempts (`OMTReceive.cs:330`).
@@ -114,6 +120,37 @@ pub enum Event {
     Redirect(Option<String>),
 }
 
+/// Bytes and frames received on one channel.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ChannelStats {
+    /// Bytes read from the socket.
+    pub bytes: u64,
+    /// Complete frames, protocol messages included.
+    pub frames: u64,
+}
+
+/// Counters since the receiver started, for [`Receiver::stats`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReceiverStats {
+    /// The video + metadata connection.
+    pub video: ChannelStats,
+    /// The audio connection.
+    pub audio: ChannelStats,
+    /// Times the connections were re-established after the first attempt,
+    /// other than to follow a redirect.
+    pub reconnects: u64,
+    /// Times the receiver switched source for a redirect (§9).
+    pub redirects: u64,
+}
+
+#[derive(Default)]
+struct Counters {
+    bytes: [AtomicU64; 2],
+    frames: [AtomicU64; 2],
+    reconnects: AtomicU64,
+    redirects: AtomicU64,
+}
+
 /// Why a connection ended.
 #[derive(Debug)]
 pub enum ReceiveError {
@@ -133,7 +170,7 @@ impl Connection {
     fn close(mut self) {
         let _ = self.stream.shutdown(Shutdown::Both);
         if let Some(h) = self.reader.take() {
-            let _ = h.join();
+            join_bounded(h, Instant::now() + DROP_TIMEOUT);
         }
     }
 }
@@ -171,6 +208,7 @@ struct Inner {
     ctl: Mutex<Control>,
     wake: Condvar,
     me: Weak<Inner>,
+    stats: Arc<Counters>,
 }
 
 /// A connection to one sender.
@@ -228,6 +266,7 @@ impl Receiver {
             ctl: Mutex::new(Control::default()),
             wake: Condvar::new(),
             me: me.clone(),
+            stats: Arc::default(),
         });
         let wait = first_must_succeed.then_some(RESOLVE_TIMEOUT);
         let pending = match inner.open_all(wait) {
@@ -304,6 +343,21 @@ impl Receiver {
         self.inner.ctl.lock().unwrap().redirect.clone()
     }
 
+    /// Counters since the receiver started.
+    pub fn stats(&self) -> ReceiverStats {
+        let c = &self.inner.stats;
+        let channel = |i: usize| ChannelStats {
+            bytes: c.bytes[i].load(Ordering::Relaxed),
+            frames: c.frames[i].load(Ordering::Relaxed),
+        };
+        ReceiverStats {
+            video: channel(0),
+            audio: channel(1),
+            reconnects: c.reconnects.load(Ordering::Relaxed),
+            redirects: c.redirects.load(Ordering::Relaxed),
+        }
+    }
+
     /// The socket address of the current connections; set before each
     /// [`Event::Connected`] is sent, cleared when they are closed.
     pub fn peer_addr(&self) -> Option<SocketAddr> {
@@ -319,11 +373,14 @@ impl Drop for Receiver {
             c.side.take()
         };
         self.inner.wake.notify_all();
+        // Sockets first, so no thread stays blocked on a stalled sender.
+        self.inner.close_all();
         drop(side);
         if let Some(h) = self.supervisor.take() {
-            let _ = h.join();
+            join_bounded(h, Instant::now() + DROP_TIMEOUT);
         }
-        // The supervisor may have started a side connection while stopping.
+        // The supervisor may have started a side connection or connected
+        // while stopping.
         let side = self.inner.ctl.lock().unwrap().side.take();
         drop(side);
         self.inner.close_all();
@@ -446,6 +503,16 @@ impl Inner {
                 }
             }
         }
+        // Held while storing, so a receiver being dropped either sees these
+        // connections or they are closed here.
+        let ctl = self.ctl.lock().unwrap();
+        if ctl.closing {
+            drop(ctl);
+            for c in [conns.video, conns.audio].into_iter().flatten() {
+                c.close();
+            }
+            return Err(io::Error::new(io::ErrorKind::Interrupted, "closing"));
+        }
         *self.conns.lock().unwrap() = conns;
         Ok(())
     }
@@ -467,9 +534,10 @@ impl Inner {
         stream.write_all(&out)?;
         let alive = Arc::new(AtomicBool::new(true));
         let (rs, ra, me) = (stream.try_clone()?, alive.clone(), self.me.clone());
+        let stats = self.stats.clone();
         let reader = std::thread::Builder::new()
             .name(format!("omt-recv-{channel:?}"))
-            .spawn(move || read_loop(rs, channel, limits, me, ra))?;
+            .spawn(move || read_loop(rs, channel, limits, me, ra, stats))?;
         // Recorded before the event, so `peer_addr` agrees with it.
         self.conns.lock().unwrap().peer = Some(addr);
         let _ = self.events.send(Event::Connected(channel));
@@ -511,6 +579,7 @@ impl Inner {
         c.redirect = new.clone();
         c.retarget = true;
         drop(c);
+        self.stats.redirects.fetch_add(1, Ordering::Relaxed);
         let _ = self.events.send(Event::Redirect(new));
         self.wake.notify_all();
     }
@@ -569,6 +638,9 @@ impl Inner {
                 self.close_all();
                 last_attempt = Instant::now();
                 pending = self.open_all(None).is_err();
+                if !pending && !retarget {
+                    self.stats.reconnects.fetch_add(1, Ordering::Relaxed);
+                }
             }
         }
     }
@@ -580,7 +652,12 @@ fn read_loop(
     limits: Limits,
     inner: Weak<Inner>,
     alive: Arc<AtomicBool>,
+    stats: Arc<Counters>,
 ) {
+    let slot = match channel {
+        Channel::Video => 0,
+        Channel::Audio => 1,
+    };
     let Some(tx) = inner.upgrade().map(|i| i.events.clone()) else {
         return;
     };
@@ -594,10 +671,12 @@ fn read_loop(
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(e) => break Some(ReceiveError::Io(e)),
         };
+        stats.bytes[slot].fetch_add(n as u64, Ordering::Relaxed);
         deframer.push(&buf[..n]);
         loop {
             match deframer.next_frame() {
                 Ok(Some(f)) => {
+                    stats.frames[slot].fetch_add(1, Ordering::Relaxed);
                     let heard = match (&f.ext, classify(&f.data)) {
                         (ExtendedHeader::None, Message::Redirect(x)) => redirect::parse(x),
                         _ => None,
@@ -773,6 +852,44 @@ mod tests {
             }
         }
         assert_eq!(saw, (true, true), "closed then connected events");
+        let stats = r.stats();
+        assert_eq!((stats.reconnects, stats.redirects), (1, 0));
+    }
+
+    #[test]
+    fn drop_is_bounded_with_a_stalled_sender() {
+        // A "sender" that accepts and then neither reads nor writes: the
+        // reader thread sits in `read` until the socket is shut down.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let r = Receiver::connect(addr, ReceiverConfig::default()).unwrap();
+        let held: Vec<_> = (0..2).map(|_| listener.accept().unwrap().0).collect();
+        assert!(r.is_connected());
+        let start = Instant::now();
+        drop(r);
+        assert!(
+            start.elapsed() < DROP_TIMEOUT + Duration::from_secs(1),
+            "drop took {:?}",
+            start.elapsed()
+        );
+        drop(held);
+    }
+
+    #[test]
+    fn drop_is_bounded_while_connecting() {
+        // The sender went away; the supervisor keeps trying while we drop.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cfg = ReceiverConfig {
+            audio: false,
+            ..ReceiverConfig::default()
+        };
+        let r = Receiver::connect(addr, cfg).unwrap();
+        drop(listener);
+        std::thread::sleep(Duration::from_millis(1200));
+        let start = Instant::now();
+        drop(r);
+        assert!(start.elapsed() < DROP_TIMEOUT + Duration::from_secs(1));
     }
 
     #[test]

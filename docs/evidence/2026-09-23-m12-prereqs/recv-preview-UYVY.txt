@@ -1,0 +1,28 @@
+log: 9/23/2026 10:47:35 AM,[OMTLogging],Log Started
+log: 9/23/2026 10:47:35 AM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/23/2026 10:47:35 AM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/23/2026 10:47:35 AM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+log: 9/23/2026 10:47:35 AM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+log: 9/23/2026 10:47:35 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 10:47:35 AM,[OMTDiscovery],New: SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-encoded):6400
+log: 9/23/2026 10:47:35 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-encoded):6400,192.168.95.8
+log: 9/23/2026 10:47:35 AM,[OMTReceive.Connect],Connected.Video: omt://127.0.0.1:6400
+log: 9/23/2026 10:47:35 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 10:47:35 AM,[OMTReceive.Connect],Connected.Audio: omt://127.0.0.1:6400
+recv video ts=71666595 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53586 meta=""
+recv video ts=79999920 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53621 meta="<HarnessFrame N=\x22240\x22 />\x00"
+pixels <HarnessFrame N=\x22240\x22 />\x00 fnv1a64=b2141fd99834cfc5 stride=160
+recv video ts=81666585 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53581 meta=""
+recv video ts=89999910 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53586 meta="<HarnessFrame N=\x22270\x22 />\x00"
+pixels <HarnessFrame N=\x22270\x22 />\x00 fnv1a64=7d186aecbc59fde3 stride=160
+recv video ts=91666575 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53559 meta=""
+recv video ts=99999900 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53581 meta="<HarnessFrame N=\x22300\x22 />\x00"
+pixels <HarnessFrame N=\x22300\x22 />\x00 fnv1a64=c7cd8e2d20cbf4c1 stride=160
+recv video ts=101666565 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53572 meta=""
+recv video ts=109999890 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53559 meta="<HarnessFrame N=\x22330\x22 />\x00"
+pixels <HarnessFrame N=\x22330\x22 />\x00 fnv1a64=2cdc374f745d9285 stride=160
+recv video ts=111666555 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53685 meta=""
+recv video ts=119999880 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53572 meta="<HarnessFrame N=\x22360\x22 />\x00"
+pixels <HarnessFrame N=\x22360\x22 />\x00 fnv1a64=9cc193abe9b63051 stride=160
+recv video ts=121666545 80x45 codec=UYVY flags=8 cs=709 rate=30/1 compressed=53619 meta=""
+recv done video=152 audio=0 info=none

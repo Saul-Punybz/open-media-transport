@@ -1,0 +1,27 @@
+log: 9/23/2026 10:47:30 AM,[OMTLogging],Log Started
+log: 9/23/2026 10:47:30 AM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/23/2026 10:47:30 AM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/23/2026 10:47:30 AM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+log: 9/23/2026 10:47:30 AM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+log: 9/23/2026 10:47:30 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 10:47:30 AM,[OMTDiscovery],New: SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-encoded):6400
+log: 9/23/2026 10:47:30 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-encoded):6400,192.168.95.8
+log: 9/23/2026 10:47:30 AM,[OMTReceive.Connect],Connected.Audio: omt://127.0.0.1:6400
+log: 9/23/2026 10:47:30 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 10:47:30 AM,[OMTReceive.Connect],Connected.Video: omt://127.0.0.1:6400
+recv video ts=20999979 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53624 meta=""
+recv video ts=29999970 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53619 meta="<HarnessFrame N=\x2290\x22 />\x00"
+pixels <HarnessFrame N=\x2290\x22 />\x00 fnv1a64=96a1796613ca3924 stride=1280
+recv video ts=31666635 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53548 meta=""
+recv video ts=39999960 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53657 meta="<HarnessFrame N=\x22120\x22 />\x00"
+pixels <HarnessFrame N=\x22120\x22 />\x00 fnv1a64=1710fab8a8e991fd stride=1280
+recv video ts=41666625 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53561 meta=""
+recv video ts=49999950 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53548 meta="<HarnessFrame N=\x22150\x22 />\x00"
+pixels <HarnessFrame N=\x22150\x22 />\x00 fnv1a64=6a0856848ad2de8a stride=1280
+recv video ts=51666615 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53591 meta=""
+recv video ts=59999940 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53561 meta="<HarnessFrame N=\x22180\x22 />\x00"
+pixels <HarnessFrame N=\x22180\x22 />\x00 fnv1a64=34e0c1a62e18db32 stride=1280
+recv video ts=61666605 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53621 meta=""
+recv video ts=69999930 640x360 codec=UYVY flags=0 cs=709 rate=30/1 compressed=53591 meta="<HarnessFrame N=\x22210\x22 />\x00"
+pixels <HarnessFrame N=\x22210\x22 />\x00 fnv1a64=53e0bc315bf513af stride=1280
+recv done video=149 audio=0 info=none

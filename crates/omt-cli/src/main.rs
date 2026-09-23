@@ -243,7 +243,10 @@ fn send(args: &[String]) -> Result<()> {
         }
         samples_sent = upto;
         let ats = aclock.audio(rate as i32, count as i32);
-        tx.send_audio(&audio, 2, rate as i32, ats, b"");
+        if count > 0 {
+            tx.send_audio(&audio, 2, rate as i32, ats, b"")
+                .map_err(|e| format!("audio: {e}"))?;
+        }
 
         let t = tx.tally();
         if t != last_tally || last_report.elapsed() >= Duration::from_secs(5) {

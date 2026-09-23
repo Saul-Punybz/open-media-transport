@@ -9,7 +9,14 @@
 //!
 //! [`Discovery::with_server`] uses a discovery server instead (§10,
 //! [`crate::discovery_server`]).
+//!
+//! One [`Discovery`] can serve a whole process: share it with an `Arc`
+//! between senders ([`crate::sender::SenderConfig::discovery`]) and
+//! directories ([`crate::address::Directory::with_shared`]), so only one
+//! mDNS responder runs. [`DiscoveryConfig::interfaces`] limits the
+//! interfaces it uses.
 
+use std::fmt;
 use std::net::IpAddr;
 use std::time::Duration;
 
@@ -95,20 +102,81 @@ pub enum SourceEvent {
     Removed(String),
 }
 
+/// Which network interfaces the mDNS responder uses. Each entry is an
+/// interface name (`en0`, `eth1`) or an address on the interface
+/// (`192.168.1.10`, meaning that interface for that address family).
+/// Loopback interfaces are never used, whatever is listed.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Interfaces {
+    /// Use only these; empty means every interface.
+    pub only: Vec<String>,
+    /// Never use these.
+    pub exclude: Vec<String>,
+}
+
+impl Interfaces {
+    /// Every non-loopback interface.
+    pub fn all() -> Self {
+        Interfaces::default()
+    }
+}
+
+/// How to start a [`Discovery`].
+#[derive(Clone, Debug)]
+pub struct DiscoveryConfig {
+    /// Use the discovery server at this URL (`omt://host[:port]`); see
+    /// [`Discovery::with_server`].
+    pub server: Option<String>,
+    /// With a server, also browse DNS-SD. Without one, DNS-SD is always used.
+    pub browse_mdns: bool,
+    /// Interfaces for mDNS.
+    pub interfaces: Interfaces,
+}
+
+impl Default for DiscoveryConfig {
+    fn default() -> Self {
+        DiscoveryConfig {
+            server: None,
+            browse_mdns: true,
+            interfaces: Interfaces::all(),
+        }
+    }
+}
+
 /// Announcements and browsing: the mDNS responder, a discovery server, or
-/// both.
+/// both. Its methods take `&self`, so one can be shared with an `Arc`.
 pub struct Discovery {
     daemon: Option<ServiceDaemon>,
     server: Option<Client>,
 }
 
+impl fmt::Debug for Discovery {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Discovery")
+            .field("mdns", &self.daemon.is_some())
+            .field("server", &self.server.is_some())
+            .finish()
+    }
+}
+
 impl Discovery {
     /// Starts the responder on every non-loopback interface.
     pub fn new() -> Result<Self, Error> {
-        Ok(Discovery {
-            daemon: Some(start_daemon()?),
-            server: None,
-        })
+        Discovery::with_config(&DiscoveryConfig::default())
+    }
+
+    /// Starts discovery as `config` says.
+    pub fn with_config(config: &DiscoveryConfig) -> Result<Self, Error> {
+        let server = match &config.server {
+            Some(url) => Some(Client::connect(url).map_err(|e| Error::Msg(e.to_string()))?),
+            None => None,
+        };
+        let daemon = if server.is_none() || config.browse_mdns {
+            Some(start_daemon(&config.interfaces)?)
+        } else {
+            None
+        };
+        Ok(Discovery { daemon, server })
     }
 
     /// Uses the discovery server at `url` (`omt://host[:port]`, port 6399 by
@@ -119,15 +187,10 @@ impl Discovery {
     /// both (`OMTDiscovery.cs:50-66`, `mac/OMTDiscoveryDnsSd.cs:172-176`).
     /// The connection is made in the background and remade if it drops.
     pub fn with_server(url: &str, browse_mdns: bool) -> Result<Self, Error> {
-        let server = Client::connect(url).map_err(|e| Error::Msg(e.to_string()))?;
-        let daemon = if browse_mdns {
-            Some(start_daemon()?)
-        } else {
-            None
-        };
-        Ok(Discovery {
-            daemon,
-            server: Some(server),
+        Discovery::with_config(&DiscoveryConfig {
+            server: Some(url.to_owned()),
+            browse_mdns,
+            interfaces: Interfaces::all(),
         })
     }
 
@@ -188,18 +251,38 @@ impl Discovery {
     }
 }
 
-fn start_daemon() -> Result<ServiceDaemon, Error> {
+fn start_daemon(interfaces: &Interfaces) -> Result<ServiceDaemon, Error> {
     let daemon = ServiceDaemon::new()?;
+    // mdns-sd applies selections in order, the last match winning.
+    if !interfaces.only.is_empty() {
+        daemon.disable_interface(IfKind::All)?;
+        daemon.enable_interface(
+            interfaces
+                .only
+                .iter()
+                .map(|s| if_kind(s))
+                .collect::<Vec<_>>(),
+        )?;
+    }
     // mdns-sd's loopback kinds match 127/8 and ::1 only; the loopback
     // interface's link-local fe80::1 (macOS lo0) would still be announced
     // to the network, so the interfaces are also excluded by name.
-    daemon.disable_interface(vec![
+    let mut off = vec![
         IfKind::LoopbackV4,
         IfKind::LoopbackV6,
         IfKind::Name("lo0".into()),
         IfKind::Name("lo".into()),
-    ])?;
+    ];
+    off.extend(interfaces.exclude.iter().map(|s| if_kind(s)));
+    daemon.disable_interface(off)?;
     Ok(daemon)
+}
+
+fn if_kind(s: &str) -> IfKind {
+    match s.parse::<IpAddr>() {
+        Ok(a) => IfKind::Addr(a),
+        Err(_) => IfKind::Name(s.to_owned()),
+    }
 }
 
 impl Drop for Discovery {
@@ -408,6 +491,47 @@ mod tests {
         a.sort_by_key(address_preference);
         let s: Vec<String> = a.iter().map(|x| x.to_string()).collect();
         assert_eq!(s, ["172.16.80.59", "2001:db8::1", "127.0.0.1", "::1"]);
+    }
+
+    #[test]
+    fn interface_entries_are_names_or_addresses() {
+        assert!(matches!(if_kind("en0"), IfKind::Name(n) if n == "en0"));
+        assert!(matches!(
+            if_kind("192.168.1.10"),
+            IfKind::Addr(IpAddr::V4(_))
+        ));
+        assert!(matches!(if_kind("fe80::1"), IfKind::Addr(IpAddr::V6(_))));
+    }
+
+    /// Needs working multicast; run with `--ignored`. A responder limited to
+    /// an interface that does not exist announces nothing.
+    #[test]
+    #[ignore = "uses the network's mDNS"]
+    fn interface_selection_limits_announcements() {
+        let nowhere = Discovery::with_config(&DiscoveryConfig {
+            interfaces: Interfaces {
+                only: vec!["omt-no-such-if0".into()],
+                exclude: Vec::new(),
+            },
+            ..DiscoveryConfig::default()
+        })
+        .unwrap();
+        let everywhere = Discovery::new().unwrap();
+        let hidden = nowhere.announce("m12-prereqs-if-hidden", 16999).unwrap();
+        let shown = everywhere.announce("m12-prereqs-if-shown", 16998).unwrap();
+        let watcher = Discovery::new().unwrap();
+        let browser = watcher.browse().unwrap();
+        let (mut saw_shown, mut saw_hidden) = (false, false);
+        let deadline = std::time::Instant::now() + Duration::from_secs(8);
+        while std::time::Instant::now() < deadline {
+            if let Some(SourceEvent::Resolved(s)) = browser.recv_timeout(Duration::from_millis(200))
+            {
+                saw_shown |= s.full_name == shown;
+                saw_hidden |= s.full_name == hidden;
+            }
+        }
+        assert!(saw_shown, "the unrestricted announcement is seen");
+        assert!(!saw_hidden, "the restricted one is not");
     }
 
     #[test]
