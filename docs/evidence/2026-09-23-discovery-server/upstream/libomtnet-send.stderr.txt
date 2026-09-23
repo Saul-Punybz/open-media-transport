@@ -1,0 +1,37 @@
+log: 9/23/2026 9:45:36 AM,[OMTLogging],Log Started
+log: 9/23/2026 9:45:36 AM,[OMTReceive.BeginConnect],ConnectingMetadata: 192.0.0.2 (6399):6399
+log: 9/23/2026 9:45:36 AM,[OMTDiscoveryClient],Started: omt://192.0.0.2:6399
+log: 9/23/2026 9:45:36 AM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/23/2026 9:45:36 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:45:36 AM,[OMTReceive.Connect],Connected.Metadata: omt://192.0.0.2:6399
+log: 9/23/2026 9:45:36 AM,[OMTDiscoveryClient],Connected to server
+log: 9/23/2026 9:45:36 AM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/23/2026 9:45:36 AM,[OMTDiscoveryClient],NewFromServer: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)
+log: 9/23/2026 9:45:36 AM,[OMTDiscovery],New: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours):6400
+log: 9/23/2026 9:45:36 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours):6400,::ffff:192.0.0.2
+log: 9/23/2026 9:45:36 AM,[OMTDiscoveryClient],NewFromServer: SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>)
+log: 9/23/2026 9:45:36 AM,[OMTDiscovery],AddIP: SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>):6401,::ffff:192.0.0.2
+log: 9/23/2026 9:45:41 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:45:41 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.0.0.2]:52061
+log: 9/23/2026 9:45:41 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:45:41 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.0.0.2]:52062
+log: 9/23/2026 9:45:44 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:45:44 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:45:44 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:45:44 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:45:44 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:45:44 AM,[OMTDiscoveryClient],Disconnected from server
+log: 9/23/2026 9:45:44 AM,[OMTDiscovery],RemovedAddressFromServer: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)
+log: 9/23/2026 9:45:44 AM,[OMTReceive.BeginConnect],ConnectingMetadata: 192.0.0.2 (6399):6399
+log: 9/23/2026 9:45:44 AM,[OMTReceive.Connect],Connection refused
+log: 9/23/2026 9:45:46 AM,[OMTReceive.BeginConnect],ConnectingMetadata: 192.0.0.2 (6399):6399
+log: 9/23/2026 9:45:46 AM,[OMTReceive.Connect],Connection refused
+log: 9/23/2026 9:45:47 AM,[OMTReceive.BeginConnect],ConnectingMetadata: 192.0.0.2 (6399):6399
+log: 9/23/2026 9:45:47 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:45:47 AM,[OMTReceive.Connect],Connected.Metadata: omt://192.0.0.2:6399
+log: 9/23/2026 9:45:47 AM,[OMTDiscoveryClient],Connected to server
+log: 9/23/2026 9:45:47 AM,[OMTDiscoveryClient],NewFromServer: SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>)
+log: 9/23/2026 9:45:47 AM,[OMTDiscoveryClient],NewFromServer: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)
+log: 9/23/2026 9:45:47 AM,[OMTDiscovery],New: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours):6400
+log: 9/23/2026 9:45:47 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours):6400,::ffff:192.0.0.2
+log: 9/23/2026 9:45:58 AM,[OMTDiscoveryClient],RemovedFromServer: SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>)

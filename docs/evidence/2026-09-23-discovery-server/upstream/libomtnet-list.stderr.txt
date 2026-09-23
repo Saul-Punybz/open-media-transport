@@ -1,0 +1,11 @@
+log: 9/23/2026 9:45:30 AM,[OMTLogging],Log Started
+log: 9/23/2026 9:45:30 AM,[OMTReceive.BeginConnect],ConnectingMetadata: 192.0.0.2 (6399):6399
+log: 9/23/2026 9:45:30 AM,[OMTDiscoveryClient],Started: omt://192.0.0.2:6399
+log: 9/23/2026 9:45:30 AM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/23/2026 9:45:30 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:45:30 AM,[OMTReceive.Connect],Connected.Metadata: omt://192.0.0.2:6399
+log: 9/23/2026 9:45:30 AM,[OMTDiscoveryClient],Connected to server
+log: 9/23/2026 9:45:30 AM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/23/2026 9:45:30 AM,[OMTDiscoveryClient],NewFromServer: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)
+log: 9/23/2026 9:45:30 AM,[OMTDiscovery],New: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours):6400
+log: 9/23/2026 9:45:30 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours):6400,::ffff:192.0.0.2

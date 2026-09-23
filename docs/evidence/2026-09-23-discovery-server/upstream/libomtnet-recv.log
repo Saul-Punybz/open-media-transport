@@ -1,0 +1,7 @@
+recv metadata ts=0 len=82 xml="<OMTInfo ProductName=\x22omt\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1.0\x22 />\x00"
+recv metadata ts=0 len=82 xml="<OMTInfo ProductName=\x22omt\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1.0\x22 />\x00"
+recv video ts=61666605 320x180 codec=UYVY flags=0 cs=709 rate=30/1 compressed=5076 meta=""
+recv audio ts=61666605 rate=48000 ch=2 spc=1600 len=12800
+recv video ts=71666595 320x180 codec=UYVY flags=0 cs=709 rate=30/1 compressed=5190 meta=""
+recv audio ts=71666595 rate=48000 ch=2 spc=1600 len=12800
+recv done video=60 audio=59 info=omt/open-media-transport/0.1.0

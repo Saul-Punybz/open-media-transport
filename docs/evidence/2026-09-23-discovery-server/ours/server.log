@@ -1,0 +1,28 @@
+discovery server on port 6399. Ctrl-C to stop.
+Connected: [::ffff:192.0.0.2]:52075
+[::ffff:192.0.0.2]:52075 ADDED SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours) port 6400 [192.0.0.2]
+Connected: [::ffff:192.0.0.2]:52076
+Disconnected: [::ffff:192.0.0.2]:52076
+Connected: [::ffff:192.0.0.2]:52077
+Disconnected: [::ffff:192.0.0.2]:52077
+Connected: [::ffff:192.0.0.2]:52080
+[::ffff:192.0.0.2]:52080 ADDED SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>) port 6401 [192.0.0.2]
+Connected: [::ffff:192.0.0.2]:52081
+Disconnected: [::ffff:192.0.0.2]:52081
+Connected: [::ffff:192.0.0.2]:52082
+Disconnected: [::ffff:192.0.0.2]:52082
+discovery server on port 6399. Ctrl-C to stop.
+Connected: [::ffff:192.0.0.2]:52090
+[::ffff:192.0.0.2]:52090 ADDED SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>) port 6401 [192.0.0.2]
+Connected: [::ffff:192.0.0.2]:52091
+[::ffff:192.0.0.2]:52091 ADDED SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours) port 6400 [192.0.0.2]
+Connected: [::ffff:192.0.0.2]:52092
+Disconnected: [::ffff:192.0.0.2]:52092
+Connected: [::ffff:192.0.0.2]:52093
+Disconnected: [::ffff:192.0.0.2]:52093
+[::ffff:192.0.0.2]:52090 REMOVED SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>)
+Disconnected: [::ffff:192.0.0.2]:52090
+Connected: [::ffff:192.0.0.2]:52094
+Disconnected: [::ffff:192.0.0.2]:52094
+[::ffff:192.0.0.2]:52091 REMOVED SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)
+Disconnected: [::ffff:192.0.0.2]:52091

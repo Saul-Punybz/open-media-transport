@@ -1,0 +1,2 @@
+send address=SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>) url=omt://SAULS-MACBOOK-PRO.LOCAL:6401 port=6401
+send done connections=0

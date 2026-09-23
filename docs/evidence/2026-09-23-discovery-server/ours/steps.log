@@ -1,0 +1,13 @@
+== 09:46:27 server starts (ours) on omt://192.0.0.2:6399
+== 09:46:28 our sender registers with the server
+== 09:46:30 libomtnet list (connects after our sender registered)
+== 09:46:34 libomtnet recv by name
+== 09:46:37 libomtnet sender registers with the server
+== 09:46:39 our list, server only
+== 09:46:42 our recv by name, server only
+== 09:46:45 server restart (both senders stay up)
+== 09:46:50 libomtnet list after restart
+== 09:46:53 our list after restart
+== 09:46:59 libomtnet sender gone; our list again
+== 09:47:09 server stops
+== 09:47:25 done

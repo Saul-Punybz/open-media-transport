@@ -1,0 +1,11 @@
+connecting to SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>) at 192.0.0.2:6401
+connected (Video channel)
+connected (Audio channel)
+metadata: <OMTInfo ProductName="omt-harness" Manufacturer="open-media-transport" Version="0.1" />
+metadata: <HarnessHello Value="1" />
+sender says: Tally(Tally { preview: false, program: false })
+metadata: <OMTInfo ProductName="omt-harness" Manufacturer="open-media-transport" Version="0.1" />
+metadata: <HarnessHello Value="1" />
+sender says: Tally(Tally { preview: false, program: false })
+   1.0s  video 640x360 30.00 fps | 29.3 fps received | 15.7 Mbit/s | audio 48000 Hz 2 ch, 31/31 frames with sound | decode errors 0
+   2.1s  video 640x360 30.00 fps | 31.0 fps received | 16.5 Mbit/s | audio 48000 Hz 2 ch, 30/30 frames with sound | decode errors 0

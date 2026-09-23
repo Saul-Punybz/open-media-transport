@@ -327,12 +327,34 @@ An alternative to DNS-SD for networks without multicast.
 
 | # | Statement | Source | Live |
 |---|---|---|---|
-| S1 | Enabled when `settings.xml` sets `DiscoveryServer` to `omt://host:port`; DNS-SD is then not used for registering. Default port 6399. | `OMTDiscovery.cs:50-66,332-360`, `OMTConstants.cs:34`, `OMTSettings.cs:41` | |
-| S2 | The client is a metadata-only OMT receiver (§4.3) and the server a metadata-only OMT sender; messages are ordinary metadata frames. | `server/OMTDiscoveryClient.cs:47-53,75-86`, `server/OMTDiscoveryServer.cs:48-52`, `OMTSend.cs:64-76` | |
-| S3 | Message: `<OMTAddress>` with child elements `Name`, `Port`, optional `Removed` = `True`, and `Addresses` containing `IPAddress` elements. | `OMTAddress.cs:251-276,278-322` | |
-| S4 | The server ignores client-supplied addresses and substitutes the client's TCP source address. | `server/OMTDiscoveryServer.cs:198-203` | |
-| S5 | The server rebroadcasts each add and remove to every connection, including the sender's; sends the full table to each new client; and removes a client's entries when it disconnects. | `server/OMTDiscoveryServer.cs:113-176` | |
-| S6 | The client sends all its local sources on (re)connect, and forgets server-learned sources on disconnect. | `server/OMTDiscoveryClient.cs:88-131` | |
+| S1 | Enabled when `settings.xml` sets `DiscoveryServer` to `omt://host:port`; DNS-SD is then not used for registering (browsing still is). Default port 6399. `settings.xml` is in `$OMT_STORAGE_PATH` if set, else `~/.OMT` (macOS). | `OMTDiscovery.cs:50-66,332-360`, `OMTConstants.cs:34`, `OMTSettings.cs:35-41,62`, `mac/MacPlatform.cs:75-84`, `mac/OMTDiscoveryDnsSd.cs:172-176` | 2026-09-23 [DS] |
+| S2 | The client is a metadata-only OMT receiver (§4.3) and the server a metadata-only OMT sender; messages are ordinary metadata frames. | `server/OMTDiscoveryClient.cs:47-53,75-86`, `server/OMTDiscoveryServer.cs:48-52`, `OMTSend.cs:64-76` | 2026-09-23 [DS] |
+| S3 | Message: `<OMTAddress>` with child elements `Name`, `Port`, optional `Removed` = `True`, and `Addresses` containing `IPAddress` elements. | `OMTAddress.cs:251-276,278-322` | 2026-09-23 [DS] |
+| S4 | The server ignores client-supplied addresses and substitutes the client's TCP source address. | `server/OMTDiscoveryServer.cs:198-203` | 2026-09-23 [DS] |
+| S5 | The server rebroadcasts each add and remove to every connection, including the sender's; sends the full table to each new client; and removes a client's entries when it disconnects. | `server/OMTDiscoveryServer.cs:113-176` | 2026-09-23 [DS] |
+| S6 | The client sends all its local sources on (re)connect, and forgets server-learned sources on disconnect. | `server/OMTDiscoveryClient.cs:88-131` | 2026-09-23 [DS] |
+
+**[DS]** — our client and server against libomtnet's client and upstream's
+`OMTDiscoveryServer`, both ways, on one Mac, captured with `tshark`:
+[`evidence/2026-09-23-discovery-server`](evidence/2026-09-23-discovery-server/README.md).
+
+- **Exact bytes** (captured from libomtnet's client and server): `XmlTextWriter` with
+  indentation, `\n` line breaks on macOS, no declaration, no NUL:
+  `<OMTAddress>\n  <Name>MACHINE (Name)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:127.0.0.1</IPAddress>\n  </Addresses>\n</OMTAddress>`,
+  with `  <Removed>True</Removed>\n` after `Port` for a removal. Text escapes `&amp;`, `&lt;`,
+  `&gt;`. IPv4 is written IPv4-mapped (`OMTAddress.cs:84-97`). A client's own address is
+  loopback (`OMTSend.cs:122-125`).
+- The server's OMT sender sends its tally (`TALLY_NONE`) on accept like any sender
+  (`OMTSend.cs:371`).
+- **Race in S5.** The server sends the table from its accept handler
+  (`OMTSend.cs:425-428`) but only to metadata-subscribed connections
+  (`OMTSend.cs:647-653`), so a new client gets it only if its subscription was processed
+  first. In [DS] it always was (100–190 ms after the subscription), but the code does not
+  guarantee it. Our server sends the table when the subscription arrives.
+- A removal is honoured from any connection, not only the one that registered the source
+  (`server/OMTDiscoveryServer.cs:195-210`). The client merges the server's echo of its own
+  source into its registered entry, so after a reconnect it re-registers with the
+  server-seen address too (`OMTDiscovery.cs:218-243`, seen in [DS]).
 
 **Conflict with upstream docs.** `PROTOCOL.md:170-174` shows `<Addresses><Address>`.
 The code writes and reads `<Addresses><IPAddress>` (`OMTAddress.cs:268,298`). Both

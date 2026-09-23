@@ -1,0 +1,32 @@
+OMTDiscoveryServer
+Command Line: omtdiscoveryserver port
+Server running on port 6399, press CTRL+C to exit...
+Connected: [::ffff:192.0.0.2]:52053
+[::ffff:192.0.0.2]:52053 ADDED SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)
+Connected: [::ffff:192.0.0.2]:52054
+Disconnected: [::ffff:192.0.0.2]:52054
+Connected: [::ffff:192.0.0.2]:52055
+Disconnected: [::ffff:192.0.0.2]:52055
+Connected: [::ffff:192.0.0.2]:52058
+[::ffff:192.0.0.2]:52058 ADDED SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>)
+Connected: [::ffff:192.0.0.2]:52059
+Disconnected: [::ffff:192.0.0.2]:52059
+Connected: [::ffff:192.0.0.2]:52060
+Disconnected: [::ffff:192.0.0.2]:52060
+OMTDiscoveryServer
+Command Line: omtdiscoveryserver port
+Server running on port 6399, press CTRL+C to exit...
+Connected: [::ffff:192.0.0.2]:52068
+[::ffff:192.0.0.2]:52068 ADDED SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>)
+Connected: [::ffff:192.0.0.2]:52069
+[::ffff:192.0.0.2]:52069 ADDED SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)
+Connected: [::ffff:192.0.0.2]:52070
+Disconnected: [::ffff:192.0.0.2]:52070
+Connected: [::ffff:192.0.0.2]:52071
+Disconnected: [::ffff:192.0.0.2]:52071
+[::ffff:192.0.0.2]:52068 REMOVED SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&<x>)
+Disconnected: [::ffff:192.0.0.2]:52068
+Connected: [::ffff:192.0.0.2]:52072
+Disconnected: [::ffff:192.0.0.2]:52072
+[::ffff:192.0.0.2]:52069 REMOVED SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)
+Disconnected: [::ffff:192.0.0.2]:52069

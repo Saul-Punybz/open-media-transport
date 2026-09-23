@@ -1,0 +1,100 @@
+   0.000 stream0 52075->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+   0.000 stream0 52075->6399 client->server ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:127.0.0.1</IPAddress>\n  </Addresses>\n</OMTAddress>
+   0.000 stream0 6399->52075 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+   0.000 stream0 6399->52075 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+   2.060 stream1 6399->52076 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+   2.064 stream1 52076->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+   2.064 stream1 6399->52076 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+   5.132 stream2 6399->52077 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+   5.136 stream2 52077->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+   5.136 stream2 6399->52077 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+   8.202 stream3 6399->52080 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+   8.205 stream3 52080->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+   8.205 stream3 6399->52080 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+   8.209 stream3 52080->6399 client->server ver=1 type=1 ts=0 len=195
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:127.0.0.1</IPAddress>\n  </Addresses>\n</OMTAddress>
+   8.209 stream0 6399->52075 server->client ver=1 type=1 ts=0 len=195
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+   8.209 stream3 6399->52080 server->client ver=1 type=1 ts=0 len=195
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  10.171 stream4 52081->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+  10.171 stream4 6399->52081 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+  10.171 stream4 6399->52081 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  10.172 stream4 6399->52081 server->client ver=1 type=1 ts=0 len=195
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  13.185 stream5 52082->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+  13.185 stream5 6399->52082 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+  13.185 stream5 6399->52082 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  13.185 stream5 6399->52082 server->client ver=1 type=1 ts=0 len=195
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  18.633 stream11 6399->52090 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+  18.633 stream11 52090->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+  18.633 stream11 52090->6399 client->server ver=1 type=1 ts=0 len=239
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:127.0.0.1</IPAddress>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  18.633 stream11 6399->52090 server->client ver=1 type=1 ts=0 len=195
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  19.233 stream12 52091->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+  19.233 stream12 52091->6399 client->server ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:127.0.0.1</IPAddress>\n  </Addresses>\n</OMTAddress>
+  19.233 stream12 6399->52091 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+  19.233 stream12 6399->52091 server->client ver=1 type=1 ts=0 len=195
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  19.233 stream11 6399->52090 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  19.233 stream12 6399->52091 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  21.292 stream13 6399->52092 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+  21.295 stream13 52092->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+  21.295 stream13 6399->52092 server->client ver=1 type=1 ts=0 len=195
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  21.295 stream13 6399->52092 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  24.317 stream14 52093->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+  24.317 stream14 6399->52093 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+  24.317 stream14 6399->52093 server->client ver=1 type=1 ts=0 len=195
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  24.317 stream14 6399->52093 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  30.214 stream11 52090->6399 client->server ver=1 type=1 ts=0 len=265
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Removed>True</Removed>\n  <Addresses>\n    <IPAddress>::ffff:127.0.0.1</IPAddress>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  30.214 stream11 6399->52090 server->client ver=1 type=1 ts=0 len=221
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Removed>True</Removed>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  30.214 stream12 6399->52091 server->client ver=1 type=1 ts=0 len=221
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-lib&amp;&lt;x&gt;)</Name>\n  <Port>6401</Port>\n  <Removed>True</Removed>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  30.228 stream15 52094->6399 client->server ver=1 type=1 ts=0 len=32
+    <OMTSubscribe Metadata="true" />
+  30.228 stream15 6399->52094 server->client ver=1 type=1 ts=0 len=45
+    <OMTTally Preview="false" Program=="false" />
+  30.228 stream15 6399->52094 server->client ver=1 type=1 ts=0 len=182
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
+  40.003 stream12 52091->6399 client->server ver=1 type=1 ts=0 len=208
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Removed>True</Removed>\n  <Addresses>\n    <IPAddress>::ffff:127.0.0.1</IPAddress>\n  </Addresses>\n</OMTAddress>
+  40.003 stream12 6399->52091 server->client ver=1 type=1 ts=0 len=208
+    <OMTAddress>\n  <Name>SAULS-MACBOOK-PRO.LOCAL (discovery-server-ours)</Name>\n  <Port>6400</Port>\n  <Removed>True</Removed>\n  <Addresses>\n    <IPAddress>::ffff:192.0.0.2</IPAddress>\n  </Addresses>\n</OMTAddress>
