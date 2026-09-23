@@ -36,7 +36,7 @@
 //! connection gets a redirect only while one is active.
 
 use std::collections::VecDeque;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::ops::RangeInclusive;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -1007,6 +1007,8 @@ struct Peer {
     id: u64,
     addr: SocketAddr,
     stream: TcpStream,
+    /// Tells the reader to stop (see [`crate::net`]).
+    stop: AtomicBool,
     state: Mutex<PeerState>,
     outbox: Outbox,
     threads: Mutex<Vec<JoinHandle<()>>>,
@@ -1018,6 +1020,7 @@ struct Peer {
 impl Peer {
     fn close(&self) {
         self.outbox.close();
+        self.stop.store(true, Ordering::SeqCst);
         let _ = self.stream.shutdown(Shutdown::Both);
     }
 
@@ -1163,11 +1166,13 @@ fn accept_loop(listener: TcpListener, shared: Arc<Shared>) {
 
 fn start_peer(stream: TcpStream, id: u64, shared: &Arc<Shared>) -> io::Result<()> {
     stream.set_nodelay(true)?; // T3
+    crate::net::stoppable(&stream)?;
     let addr = stream.peer_addr()?;
     let peer = Arc::new(Peer {
         id,
         addr,
         stream: stream.try_clone()?,
+        stop: AtomicBool::new(false),
         state: Mutex::new(PeerState::default()),
         outbox: Outbox::new(),
         threads: Mutex::new(Vec::new()),
@@ -1234,7 +1239,7 @@ fn read_loop(mut stream: TcpStream, peer: Arc<Peer>, shared: Arc<Shared>) {
     let mut deframer = Deframer::new(Limits::AUDIO_OR_METADATA);
     let mut buf = vec![0u8; 64 * 1024];
     'read: loop {
-        let n = match stream.read(&mut buf) {
+        let n = match crate::net::read(&mut stream, &mut buf, &peer.stop) {
             Ok(0) => break,
             Ok(n) => n,
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,

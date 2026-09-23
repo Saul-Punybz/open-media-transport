@@ -40,7 +40,7 @@
 //! [`DROP_TIMEOUT`] for its threads; one still busy after that (say, in a
 //! connection attempt) finishes on its own and closes what it opened.
 
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex, Weak};
@@ -163,15 +163,39 @@ pub enum ReceiveError {
 struct Connection {
     stream: TcpStream,
     alive: Arc<AtomicBool>,
+    /// Tells the reader to stop (see [`crate::net`]).
+    stop: Arc<AtomicBool>,
     reader: Option<JoinHandle<()>>,
 }
 
 impl Connection {
-    fn close(mut self) {
+    /// Ends the connection; the reader thread stops soon after.
+    fn shut(&self) {
+        self.stop.store(true, Ordering::SeqCst);
         let _ = self.stream.shutdown(Shutdown::Both);
+    }
+
+    /// Waits until `deadline` for the reader thread.
+    fn join(mut self, deadline: Instant) {
         if let Some(h) = self.reader.take() {
-            join_bounded(h, Instant::now() + DROP_TIMEOUT);
+            join_bounded(h, deadline);
         }
+    }
+
+    fn close(self) {
+        self.shut();
+        self.join(Instant::now() + DROP_TIMEOUT);
+    }
+}
+
+/// Shuts all of `conns` down, then waits for their readers together.
+fn close_each(conns: impl IntoIterator<Item = Connection>, deadline: Instant) {
+    let conns: Vec<Connection> = conns.into_iter().collect();
+    for c in &conns {
+        c.shut();
+    }
+    for c in conns {
+        c.join(deadline);
     }
 }
 
@@ -281,7 +305,7 @@ impl Receiver {
         let supervisor = match supervisor {
             Ok(h) => h,
             Err(e) => {
-                inner.close_all();
+                inner.close_all(Instant::now() + DROP_TIMEOUT);
                 return Err(e);
             }
         };
@@ -373,17 +397,18 @@ impl Drop for Receiver {
             c.side.take()
         };
         self.inner.wake.notify_all();
+        let deadline = Instant::now() + DROP_TIMEOUT;
         // Sockets first, so no thread stays blocked on a stalled sender.
-        self.inner.close_all();
+        self.inner.close_all(deadline);
         drop(side);
         if let Some(h) = self.supervisor.take() {
-            join_bounded(h, Instant::now() + DROP_TIMEOUT);
+            join_bounded(h, deadline);
         }
         // The supervisor may have started a side connection or connected
         // while stopping.
         let side = self.inner.ctl.lock().unwrap().side.take();
         drop(side);
-        self.inner.close_all();
+        self.inner.close_all(deadline);
     }
 }
 
@@ -397,11 +422,9 @@ impl Inner {
         (!need_video || ok(&conns.video)) && (!cfg.audio || ok(&conns.audio))
     }
 
-    fn close_all(&self) {
+    fn close_all(&self, deadline: Instant) {
         let old = std::mem::take(&mut *self.conns.lock().unwrap());
-        for c in [old.video, old.audio].into_iter().flatten() {
-            c.close();
-        }
+        close_each([old.video, old.audio].into_iter().flatten(), deadline);
     }
 
     /// The directory, started on first use.
@@ -508,9 +531,8 @@ impl Inner {
         let ctl = self.ctl.lock().unwrap();
         if ctl.closing {
             drop(ctl);
-            for c in [conns.video, conns.audio].into_iter().flatten() {
-                c.close();
-            }
+            let deadline = Instant::now() + DROP_TIMEOUT;
+            close_each([conns.video, conns.audio].into_iter().flatten(), deadline);
             return Err(io::Error::new(io::ErrorKind::Interrupted, "closing"));
         }
         *self.conns.lock().unwrap() = conns;
@@ -532,18 +554,21 @@ impl Inner {
             frame::write_metadata(0, c.as_bytes(), &mut out);
         }
         stream.write_all(&out)?;
+        crate::net::stoppable(&stream)?;
         let alive = Arc::new(AtomicBool::new(true));
+        let stop = Arc::new(AtomicBool::new(false));
         let (rs, ra, me) = (stream.try_clone()?, alive.clone(), self.me.clone());
-        let stats = self.stats.clone();
+        let (stats, rstop) = (self.stats.clone(), stop.clone());
         let reader = std::thread::Builder::new()
             .name(format!("omt-recv-{channel:?}"))
-            .spawn(move || read_loop(rs, channel, limits, me, ra, stats))?;
+            .spawn(move || read_loop(rs, channel, limits, me, ra, rstop, stats))?;
         // Recorded before the event, so `peer_addr` agrees with it.
         self.conns.lock().unwrap().peer = Some(addr);
         let _ = self.events.send(Event::Connected(channel));
         Ok(Connection {
             stream,
             alive,
+            stop,
             reader: Some(reader),
         })
     }
@@ -635,7 +660,7 @@ impl Inner {
             let reconnect = self.config.lock().unwrap().reconnect;
             let due = last_attempt.elapsed() >= RETRY_INTERVAL;
             if retarget || ((reconnect || pending) && due && !self.connected()) {
-                self.close_all();
+                self.close_all(Instant::now() + DROP_TIMEOUT);
                 last_attempt = Instant::now();
                 pending = self.open_all(None).is_err();
                 if !pending && !retarget {
@@ -652,6 +677,7 @@ fn read_loop(
     limits: Limits,
     inner: Weak<Inner>,
     alive: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>,
     stats: Arc<Counters>,
 ) {
     let slot = match channel {
@@ -665,7 +691,7 @@ fn read_loop(
     // libomtnet reads at most 128 KiB per call (`OMTConstants.cs:44`).
     let mut buf = vec![0u8; 128 * 1024];
     let reason = 'read: loop {
-        let n = match stream.read(&mut buf) {
+        let n = match crate::net::read(&mut stream, &mut buf, &stop) {
             Ok(0) => break None,
             Ok(n) => n,
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
@@ -709,6 +735,7 @@ mod tests {
     use super::*;
     use crate::command::classify;
     use crate::command::Message;
+    use std::io::Read;
     use std::net::TcpListener;
     use std::time::Instant;
 

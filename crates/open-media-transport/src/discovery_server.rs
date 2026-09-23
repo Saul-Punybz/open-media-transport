@@ -29,7 +29,7 @@
 //! always gets it.
 
 use std::collections::BTreeMap;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex};
@@ -39,6 +39,7 @@ use std::time::{Duration, Instant};
 use crate::command::{classify, Command, Message, Tally};
 use crate::discovery::{self, Source, SourceEvent};
 use crate::frame::ExtendedHeader;
+use crate::sender::{join_bounded, DROP_TIMEOUT};
 use crate::{frame, Deframer, Limits};
 
 /// Port a client uses when the server URL has none (`OMTConstants.cs:34`,
@@ -280,13 +281,17 @@ pub fn parse_url(url: &str) -> io::Result<(String, u16)> {
 /// the local sources (`OMTReceive.cs:506-512,451-454`,
 /// `server/OMTDiscoveryClient.cs:88-118`). It reconnects at most once a
 /// second, resolving the host name again each time, as libomtnet does
-/// (`OMTReceive.cs:328-347`).
+/// (`OMTReceive.cs:328-347`). Dropping it waits at most
+/// [`DROP_TIMEOUT`] for the background thread; one still in a connection
+/// attempt after that finishes on its own.
 pub struct Client {
     shared: Arc<ClientShared>,
     worker: Option<JoinHandle<()>>,
 }
 
 struct ClientShared {
+    /// Tells the reader to stop (see [`crate::net`]).
+    stop: AtomicBool,
     host: String,
     port: u16,
     state: Mutex<ClientState>,
@@ -311,6 +316,7 @@ impl Client {
     pub fn connect(url: &str) -> io::Result<Client> {
         let (host, port) = parse_url(url)?;
         let shared = Arc::new(ClientShared {
+            stop: AtomicBool::new(false),
             host,
             port,
             state: Mutex::new(ClientState::default()),
@@ -391,13 +397,14 @@ impl Drop for Client {
         {
             let mut st = self.shared.state.lock().unwrap();
             st.closing = true;
+            self.shared.stop.store(true, Ordering::SeqCst);
             if let Some(s) = &st.stream {
                 let _ = s.shutdown(Shutdown::Both);
             }
         }
         self.shared.wake.notify_all();
         if let Some(h) = self.worker.take() {
-            let _ = h.join();
+            join_bounded(h, Instant::now() + DROP_TIMEOUT);
         }
     }
 }
@@ -441,6 +448,9 @@ impl ClientShared {
             let Ok(stream) = connect_any(&self.host, self.port) else {
                 continue;
             };
+            if crate::net::stoppable(&stream).is_err() {
+                continue;
+            }
             let Ok(writer) = stream.try_clone() else {
                 continue;
             };
@@ -480,7 +490,7 @@ impl ClientShared {
         let mut deframer = Deframer::new(Limits::AUDIO_OR_METADATA);
         let mut buf = vec![0u8; 64 * 1024];
         loop {
-            let n = match stream.read(&mut buf) {
+            let n = match crate::net::read(&mut stream, &mut buf, &self.stop) {
                 Ok(0) => return,
                 Ok(n) => n,
                 Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
@@ -595,7 +605,8 @@ pub struct ServerEntry {
     pub from: SocketAddr,
 }
 
-/// A discovery server (S2, S4, S5).
+/// A discovery server (S2, S4, S5). Dropping it closes every connection
+/// and waits at most [`DROP_TIMEOUT`] for its threads.
 pub struct Server {
     port: u16,
     shared: Arc<ServerShared>,
@@ -627,6 +638,8 @@ struct Peer {
     addr: SocketAddr,
     stream: TcpStream,
     metadata: AtomicBool,
+    /// Tells the reader to stop (see [`crate::net`]).
+    stop: AtomicBool,
 }
 
 impl Peer {
@@ -634,8 +647,13 @@ impl Peer {
     /// never interleave. A failed or timed-out write closes the connection.
     fn send(&self, bytes: &[u8]) {
         if (&self.stream).write_all(bytes).is_err() {
-            let _ = self.stream.shutdown(Shutdown::Both);
+            self.close();
         }
+    }
+
+    fn close(&self) {
+        self.stop.store(true, Ordering::SeqCst);
+        let _ = self.stream.shutdown(Shutdown::Both);
     }
 }
 
@@ -711,15 +729,16 @@ impl Drop for Server {
                 break;
             }
         }
+        let deadline = Instant::now() + DROP_TIMEOUT;
         if let Some(h) = self.accept.take() {
-            let _ = h.join();
+            join_bounded(h, deadline);
         }
         for p in &self.shared.table.lock().unwrap().peers {
-            let _ = p.stream.shutdown(Shutdown::Both);
+            p.close();
         }
         let readers = std::mem::take(&mut *self.shared.readers.lock().unwrap());
         for h in readers {
-            let _ = h.join();
+            join_bounded(h, deadline);
         }
     }
 }
@@ -746,12 +765,14 @@ impl ServerShared {
     fn start_peer(self: &Arc<Self>, stream: TcpStream, id: u64) -> io::Result<()> {
         stream.set_nodelay(true)?; // T3
         stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
+        crate::net::stoppable(&stream)?;
         let addr = stream.peer_addr()?;
         let peer = Arc::new(Peer {
             id,
             addr,
             stream: stream.try_clone()?,
             metadata: AtomicBool::new(false),
+            stop: AtomicBool::new(false),
         });
         {
             let mut t = self.table.lock().unwrap();
@@ -775,7 +796,7 @@ impl ServerShared {
         let mut deframer = Deframer::new(Limits::AUDIO_OR_METADATA);
         let mut buf = vec![0u8; 64 * 1024];
         'read: loop {
-            let n = match stream.read(&mut buf) {
+            let n = match crate::net::read(&mut stream, &mut buf, &peer.stop) {
                 Ok(0) => break,
                 Ok(n) => n,
                 Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,

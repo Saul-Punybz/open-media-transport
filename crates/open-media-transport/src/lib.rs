@@ -54,6 +54,7 @@ pub mod discovery;
 pub mod discovery_server;
 pub mod frame;
 pub mod media;
+mod net;
 pub mod receiver;
 pub mod redirect;
 pub mod sender;
