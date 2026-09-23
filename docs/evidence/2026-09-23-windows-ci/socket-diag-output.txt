@@ -1,0 +1,61 @@
+## run 35880930894, test (ubuntu-latest)
+DIAG connect to closed port: Err(Os { code: 111, kind: ConnectionRefused, message: "Connection refused" }) after 65.743µs
+DIAG peer read after our shutdown: Ok(0) after 3.637µs
+DIAG our read after peer shutdown: Ok(("Ok(0)", 300.277331ms)) after 66.786µs
+DIAG clone shutdown(Both): Ok(("Ok(0)", 300.241062ms)) after 116.939µs
+DIAG clone shutdown(Read): Ok(("Ok(0)", 300.221704ms)) after 93.615µs
+DIAG blocked write after clone shutdown: Ok(("Os { code: 32, kind: BrokenPipe, message: \"Broken pipe\" }", 1.000142348s)) after 86.792µs
+DIAG explicit 127.0.0.1:38545 over [::]:38545: Err(Os { code: 98, kind: AddrInUse, message: "Address already in use" })
+DIAG ephemeral 127.0.0.1:0 got the dual-stack port 0 times of 3000
+## run 35880930894, test (windows-latest)
+DIAG connect to closed port: Err(Os { code: 10061, kind: ConnectionRefused, message: "No connection could be made because the target machine actively refused it." }) after 2.0230595s
+DIAG peer read after our shutdown: Ok(0) after 16.7µs
+DIAG our read after peer shutdown: Ok(("Ok(0)", 300.5651ms)) after 111.1µs
+DIAG clone shutdown(Both): Err(Timeout) after 3.0012531s
+DIAG clone shutdown(Read): Err(Timeout) after 3.0014047s
+DIAG blocked write after clone shutdown: Err(Timeout) after 3.000275s
+DIAG explicit 127.0.0.1:49350 over [::]:49350: Ok(())
+DIAG ephemeral 127.0.0.1:0 got the dual-stack port 0 times of 3000
+DIAG connect 127.0.0.1 went to: specific=true dual=false
+## run 35880930894, test (macos-latest)
+DIAG connect to closed port: Err(Os { code: 61, kind: ConnectionRefused, message: "Connection refused" }) after 87.292µs
+DIAG peer read after our shutdown: Ok(0) after 52.334µs
+DIAG our read after peer shutdown: Ok(("Ok(0)", 368.306292ms)) after 80.25µs
+DIAG clone shutdown(Both): Ok(("Ok(0)", 364.438917ms)) after 145.042µs
+DIAG clone shutdown(Read): Ok(("Ok(0)", 371.536042ms)) after 39.833µs
+DIAG blocked write after clone shutdown: Ok(("Os { code: 32, kind: BrokenPipe, message: \"Broken pipe\" }", 1.0126035s)) after 184.875µs
+DIAG explicit 127.0.0.1:49194 over [::]:49194: Ok(())
+DIAG ephemeral 127.0.0.1:0 got the dual-stack port 0 times of 3000
+DIAG connect 127.0.0.1 went to: specific=true dual=false
+## run 35881670113, test (ubuntu-latest)
+DIAG connect to closed port: Err(Os { code: 111, kind: ConnectionRefused, message: "Connection refused" }) after 66.585µs
+DIAG dual-stack [::]:0 got a port held by 127.0.0.1: 0 of 500 []
+DIAG peer read after our shutdown: Ok(0) after 4.819µs
+DIAG our read after peer shutdown: Ok(("Ok(0)", 300.293383ms)) after 98.675µs
+DIAG clone shutdown(Both): Ok(("Ok(0)", 300.225916ms)) after 124.974µs
+DIAG clone shutdown(Read): Ok(("Ok(0)", 300.250941ms)) after 92.473µs
+DIAG blocked write after clone shutdown: Ok(("Os { code: 32, kind: BrokenPipe, message: \"Broken pipe\" }", 1.00020756s)) after 125.606µs
+DIAG explicit 127.0.0.1:32899 over [::]:32899: Err(Os { code: 98, kind: AddrInUse, message: "Address already in use" })
+DIAG ephemeral 127.0.0.1:0 got the dual-stack port 0 times of 3000
+## run 35881670113, test (windows-latest)
+DIAG connect to closed port: Err(Os { code: 10061, kind: ConnectionRefused, message: "No connection could be made because the target machine actively refused it." }) after 2.0198875s
+DIAG dual-stack [::]:0 got a port held by 127.0.0.1: 0 of 500 []
+DIAG peer read after our shutdown: Ok(0) after 12.4µs
+DIAG our read after peer shutdown: Ok(("Ok(0)", 300.8973ms)) after 244.2µs
+DIAG clone shutdown(Both): Err(Timeout) after 3.0093698s
+DIAG clone shutdown(Read): Err(Timeout) after 3.0069445s
+DIAG blocked write after clone shutdown: Err(Timeout) after 3.0014837s
+DIAG explicit 127.0.0.1:62655 over [::]:62655: Ok(())
+DIAG ephemeral 127.0.0.1:0 got the dual-stack port 0 times of 3000
+DIAG connect 127.0.0.1 went to: specific=true dual=false
+## run 35881670113, test (macos-latest)
+DIAG connect to closed port: Err(Os { code: 61, kind: ConnectionRefused, message: "Connection refused" }) after 99.5µs
+DIAG dual-stack [::]:0 got a port held by 127.0.0.1: 0 of 500 []
+DIAG peer read after our shutdown: Ok(0) after 37.875µs
+DIAG our read after peer shutdown: Ok(("Ok(0)", 300.379ms)) after 55.417µs
+DIAG clone shutdown(Both): Ok(("Ok(0)", 303.350291ms)) after 145.042µs
+DIAG clone shutdown(Read): Ok(("Ok(0)", 325.385208ms)) after 55.917µs
+DIAG blocked write after clone shutdown: Ok(("Os { code: 32, kind: BrokenPipe, message: \"Broken pipe\" }", 1.057748792s)) after 68.834µs
+DIAG explicit 127.0.0.1:52689 over [::]:52689: Ok(())
+DIAG ephemeral 127.0.0.1:0 got the dual-stack port 0 times of 3000
+DIAG connect 127.0.0.1 went to: specific=true dual=false
