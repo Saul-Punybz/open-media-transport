@@ -1,0 +1,5 @@
+sending "SAULS-MACBOOK-PRO.LOCAL (decode-10bit)" on port 6400 — 640x360 10-bit at 30.00 fps. Ctrl-C to stop.
+   1.7s  connections=4 video_receivers=2 tally=PGM dropped=0
+   6.7s  connections=2 video_receivers=1 tally=PGM dropped=0
+   6.8s  connections=2 video_receivers=1 tally= dropped=0
+  11.8s  connections=0 video_receivers=0 tally= dropped=0

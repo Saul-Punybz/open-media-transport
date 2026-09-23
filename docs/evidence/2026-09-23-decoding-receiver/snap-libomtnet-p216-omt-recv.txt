@@ -1,0 +1,13 @@
+connecting to 127.0.0.1:6400
+connected (Video channel) to 127.0.0.1:6400
+connected (Audio channel) to 127.0.0.1:6400
+metadata: <OMTInfo ProductName="omt-harness" Manufacturer="open-media-transport" Version="0.1" />
+metadata: <HarnessHello Value="1" />
+sender says: Tally(Tally { preview: false, program: false })
+metadata: <OMTInfo ProductName="omt-harness" Manufacturer="open-media-transport" Version="0.1" />
+metadata: <HarnessHello Value="1" />
+sender says: Tally(Tally { preview: false, program: false })
+   1.0s  video 640x360 30.00 fps 10-bit | 30.7 fps received | 11.0 Mbit/s | audio 48000 Hz 2 ch, 30/30 frames with sound | decode errors 0
+   2.0s  video 640x360 30.00 fps 10-bit | 30.0 fps received | 10.8 Mbit/s | audio 48000 Hz 2 ch, 30/30 frames with sound | decode errors 0
+   3.0s  video 640x360 30.00 fps 10-bit | 30.0 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 30/30 frames with sound | decode errors 0
+saved 640x360 snapshot to snap-libomtnet-p216.png (16-bit PNG from a 10-bit source)

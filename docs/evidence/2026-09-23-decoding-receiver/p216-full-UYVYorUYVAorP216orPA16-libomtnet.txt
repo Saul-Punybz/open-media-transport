@@ -1,0 +1,39 @@
+log: 9/23/2026 9:58:26 AM,[OMTLogging],Log Started
+log: 9/23/2026 9:58:26 AM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/23/2026 9:58:26 AM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/23/2026 9:58:26 AM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+log: 9/23/2026 9:58:26 AM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+log: 9/23/2026 9:58:26 AM,[OMTDiscovery],New: SAULS-MACBOOK-PRO.LOCAL (decode-p216):6400
+log: 9/23/2026 9:58:26 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:58:26 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (decode-p216):6400,::1
+log: 9/23/2026 9:58:26 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (decode-p216):6400,127.0.0.1
+log: 9/23/2026 9:58:26 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (decode-p216):6400,2607:fb90:cd8b:5d09:1c68:4c1e:f4f9:3784
+recv metadata ts=0 len=88 xml="<OMTInfo ProductName=\x22omt-harness\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1\x22 />\x00"
+recv metadata ts=0 len=27 xml="<HarnessHello Value=\x221\x22 />\x00"
+log: 9/23/2026 9:58:26 AM,[OMTReceive.Connect],Connected.Video: omt://127.0.0.1:6400
+log: 9/23/2026 9:58:26 AM,[OMTChannel],KeepAlive.Enabled
+recv metadata ts=0 len=88 xml="<OMTInfo ProductName=\x22omt-harness\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1\x22 />\x00"
+recv metadata ts=0 len=27 xml="<HarnessHello Value=\x221\x22 />\x00"
+log: 9/23/2026 9:58:26 AM,[OMTReceive.Connect],Connected.Audio: omt://127.0.0.1:6400
+recv video ts=30333303 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=42683 meta=""
+recv audio ts=30333303 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=b15d67cf12e62216
+recv video ts=39999960 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=43068 meta="<HarnessFrame N=\x22120\x22 />\x00"
+pixels <HarnessFrame N=\x22120\x22 />\x00 fnv1a64=033f7289dbcd2f30 stride=1280
+recv video ts=40333293 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=41862 meta=""
+recv audio ts=40333293 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=92fd37c7640da8b7
+recv video ts=49999950 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=42707 meta="<HarnessFrame N=\x22150\x22 />\x00"
+pixels <HarnessFrame N=\x22150\x22 />\x00 fnv1a64=9a83dc7bd6d3222c stride=1280
+recv video ts=50333283 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=41544 meta=""
+recv audio ts=50333283 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=1da54add6f49bbfd
+recv video ts=59999940 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=40758 meta="<HarnessFrame N=\x22180\x22 />\x00"
+pixels <HarnessFrame N=\x22180\x22 />\x00 fnv1a64=4854fd09ee8ac79f stride=1280
+recv video ts=60333273 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=42352 meta=""
+recv audio ts=60333273 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=f15a11d7cd1ad99e
+recv video ts=69999930 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=41259 meta="<HarnessFrame N=\x22210\x22 />\x00"
+pixels <HarnessFrame N=\x22210\x22 />\x00 fnv1a64=a3735c1f4ff94abd stride=1280
+recv video ts=70333263 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=43175 meta=""
+recv audio ts=70333263 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=9bd25958d76bc7a9
+recv video ts=79999920 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=43595 meta="<HarnessFrame N=\x22240\x22 />\x00"
+pixels <HarnessFrame N=\x22240\x22 />\x00 fnv1a64=76da5f8bae1a868b stride=1280
+recv video ts=80333253 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=42357 meta=""
+recv done video=151 audio=150 info=omt-harness/open-media-transport/0.1

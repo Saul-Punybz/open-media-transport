@@ -1,0 +1,172 @@
+connecting to 127.0.0.1:6400
+connected Video 127.0.0.1:6400
+connected Audio 127.0.0.1:6400
+metadata Video application xml=""
+metadata Video application xml=""
+metadata Video application xml=""
+metadata Video application xml=""
+metadata Audio sender-info xml="<OMTInfo ProductName=\x22omt-harness\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1\x22 />"
+metadata Audio application xml="<HarnessHello Value=\x221\x22 />"
+metadata Audio command Tally(Tally { preview: false, program: true }) xml="<OMTTally Preview=\x22false\x22 Program==\x22true\x22 />"
+audio ts=283333050 rate=48000 ch=2 spc=1600 fnv1a64=82be44ad90da6b6f
+video ts=283333050 80x45 codec=UYVA flags=10 cs=709 rate=30/1 meta=""
+audio ts=283666383 rate=48000 ch=2 spc=1600 fnv1a64=6d55ca044ac2d8b7
+audio ts=283999716 rate=48000 ch=2 spc=1600 fnv1a64=9d9377f866c69948
+audio ts=284333049 rate=48000 ch=2 spc=1600 fnv1a64=33f7505090cff3b3
+audio ts=284666382 rate=48000 ch=2 spc=1600 fnv1a64=f6ea7a4862a62ce3
+audio ts=284999715 rate=48000 ch=2 spc=1600 fnv1a64=0471441a88514f2d
+audio ts=285333048 rate=48000 ch=2 spc=1600 fnv1a64=c5bbc734426eeded
+audio ts=285666381 rate=48000 ch=2 spc=1600 fnv1a64=068534d7fff7ffb0
+audio ts=285999714 rate=48000 ch=2 spc=1600 fnv1a64=69e6fe3eb06f0a9c
+audio ts=286333047 rate=48000 ch=2 spc=1600 fnv1a64=0397039c1e4606f9
+audio ts=286666380 rate=48000 ch=2 spc=1600 fnv1a64=cc4e95ac7fc821ff
+audio ts=286999713 rate=48000 ch=2 spc=1600 fnv1a64=d4e839d69eba9252
+audio ts=287333046 rate=48000 ch=2 spc=1600 fnv1a64=03dbf843ec5cde03
+audio ts=287666379 rate=48000 ch=2 spc=1600 fnv1a64=3432b2d8ec1d6b0e
+audio ts=287999712 rate=48000 ch=2 spc=1600 fnv1a64=22fc82c92e7133ed
+audio ts=288333045 rate=48000 ch=2 spc=1600 fnv1a64=50bdde9b4b11b8de
+audio ts=288666378 rate=48000 ch=2 spc=1600 fnv1a64=b7c4507d8cff0a0b
+audio ts=288999711 rate=48000 ch=2 spc=1600 fnv1a64=382a06d82d6365d8
+audio ts=289333044 rate=48000 ch=2 spc=1600 fnv1a64=2b814cecf4548a6f
+audio ts=289666377 rate=48000 ch=2 spc=1600 fnv1a64=c985f720a0282145
+video ts=289999710 80x45 codec=UYVA flags=10 cs=709 rate=30/1 meta="\xE8\x0E\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC"
+pixels \xE8\x0E\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=a989d6ecd66d2ad5 stride=160
+audio ts=289999710 rate=48000 ch=2 spc=1600 fnv1a64=3ff78a6714da6c77
+audio ts=290333043 rate=48000 ch=2 spc=1600 fnv1a64=7f54873fababfbc5
+audio ts=290666376 rate=48000 ch=2 spc=1600 fnv1a64=2aee1e9617a24dac
+audio ts=290999709 rate=48000 ch=2 spc=1600 fnv1a64=efb3db66f81be8e0
+audio ts=291333042 rate=48000 ch=2 spc=1600 fnv1a64=e88f225c2cb02f8a
+audio ts=291666375 rate=48000 ch=2 spc=1600 fnv1a64=77e08a1b16637534
+audio ts=291999708 rate=48000 ch=2 spc=1600 fnv1a64=fd9911c88528d839
+audio ts=292333041 rate=48000 ch=2 spc=1600 fnv1a64=7bc75e288dd9c627
+audio ts=292666374 rate=48000 ch=2 spc=1600 fnv1a64=3bf77e6b7b649acc
+audio ts=292999707 rate=48000 ch=2 spc=1600 fnv1a64=ce700356f4169048
+audio ts=293333040 rate=48000 ch=2 spc=1600 fnv1a64=1f0a6c4cd15a15d2
+audio ts=293666373 rate=48000 ch=2 spc=1600 fnv1a64=4a07299b5fa42015
+audio ts=293999706 rate=48000 ch=2 spc=1600 fnv1a64=8774cd8ea71c2874
+audio ts=294333039 rate=48000 ch=2 spc=1600 fnv1a64=7b6f0cca067bc30c
+audio ts=294666372 rate=48000 ch=2 spc=1600 fnv1a64=3f5bd49ef6e5687d
+audio ts=294999705 rate=48000 ch=2 spc=1600 fnv1a64=b500e33ca69ebadf
+audio ts=295333038 rate=48000 ch=2 spc=1600 fnv1a64=b19ace2e13b06349
+audio ts=295666371 rate=48000 ch=2 spc=1600 fnv1a64=6cf15f36adee7533
+audio ts=295999704 rate=48000 ch=2 spc=1600 fnv1a64=af165829548dcd5c
+audio ts=296333037 rate=48000 ch=2 spc=1600 fnv1a64=cd54b95c69564451
+audio ts=296666370 rate=48000 ch=2 spc=1600 fnv1a64=0050e64994bb7003
+audio ts=296999703 rate=48000 ch=2 spc=1600 fnv1a64=3ac99973fcb37944
+audio ts=297333036 rate=48000 ch=2 spc=1600 fnv1a64=97f1c2729c4d0651
+audio ts=297666369 rate=48000 ch=2 spc=1600 fnv1a64=42079d12e0d037cf
+audio ts=297999702 rate=48000 ch=2 spc=1600 fnv1a64=78f5a4338f4ae22b
+audio ts=298333035 rate=48000 ch=2 spc=1600 fnv1a64=41059d607ffbdc13
+audio ts=298666368 rate=48000 ch=2 spc=1600 fnv1a64=e298d6399321df6c
+audio ts=298999701 rate=48000 ch=2 spc=1600 fnv1a64=a8cc9e5d50dde2f5
+audio ts=299333034 rate=48000 ch=2 spc=1600 fnv1a64=472bc52c7ea8508a
+audio ts=299666367 rate=48000 ch=2 spc=1600 fnv1a64=693785b47d092812
+video ts=299999700 80x45 codec=UYVA flags=10 cs=709 rate=30/1 meta="\xEF\x0F\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC"
+pixels \xEF\x0F\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=feb94da7e0c7f4dd stride=160
+audio ts=299999700 rate=48000 ch=2 spc=1600 fnv1a64=1a66aadbdb527a3f
+audio ts=300333033 rate=48000 ch=2 spc=1600 fnv1a64=d989bc12ca34d33f
+audio ts=300666366 rate=48000 ch=2 spc=1600 fnv1a64=067887cca85c3246
+audio ts=300999699 rate=48000 ch=2 spc=1600 fnv1a64=894893d64707098a
+audio ts=301333032 rate=48000 ch=2 spc=1600 fnv1a64=3caa3a9edb4b1f52
+audio ts=301666365 rate=48000 ch=2 spc=1600 fnv1a64=b0008015fd5da6db
+audio ts=301999698 rate=48000 ch=2 spc=1600 fnv1a64=47a7e2f1820e4e5d
+audio ts=302333031 rate=48000 ch=2 spc=1600 fnv1a64=c12df1c0f93fc08c
+audio ts=302666364 rate=48000 ch=2 spc=1600 fnv1a64=94e756f18eb20961
+audio ts=302999697 rate=48000 ch=2 spc=1600 fnv1a64=47b9ad3a5590b7bd
+audio ts=303333030 rate=48000 ch=2 spc=1600 fnv1a64=36290128caaf9770
+audio ts=303666363 rate=48000 ch=2 spc=1600 fnv1a64=0393adc16a7f817c
+audio ts=303999696 rate=48000 ch=2 spc=1600 fnv1a64=716f957de04af786
+audio ts=304333029 rate=48000 ch=2 spc=1600 fnv1a64=090fa5b42aee2461
+audio ts=304666362 rate=48000 ch=2 spc=1600 fnv1a64=caeeb65fbe4564a3
+audio ts=304999695 rate=48000 ch=2 spc=1600 fnv1a64=5ef0d38e0a67d72b
+audio ts=305333028 rate=48000 ch=2 spc=1600 fnv1a64=9ef2e16f4a4daab2
+audio ts=305666361 rate=48000 ch=2 spc=1600 fnv1a64=7782f2b99fa7ed10
+audio ts=305999694 rate=48000 ch=2 spc=1600 fnv1a64=bfe1874f4f541559
+audio ts=306333027 rate=48000 ch=2 spc=1600 fnv1a64=482e059fbb86232f
+audio ts=306666360 rate=48000 ch=2 spc=1600 fnv1a64=f6d1e3ab1751d020
+audio ts=306999693 rate=48000 ch=2 spc=1600 fnv1a64=c4a451ab83403c1f
+audio ts=307333026 rate=48000 ch=2 spc=1600 fnv1a64=3372f4e7db639b64
+audio ts=307666359 rate=48000 ch=2 spc=1600 fnv1a64=3d122794f2df83ae
+audio ts=307999692 rate=48000 ch=2 spc=1600 fnv1a64=70b9e570af993251
+audio ts=308333025 rate=48000 ch=2 spc=1600 fnv1a64=e01afb97bff81dcf
+audio ts=308666358 rate=48000 ch=2 spc=1600 fnv1a64=91f7d925ed16dd44
+audio ts=308999691 rate=48000 ch=2 spc=1600 fnv1a64=234ece38b28b74f7
+audio ts=309333024 rate=48000 ch=2 spc=1600 fnv1a64=5bc6e149c9ec5acb
+audio ts=309666357 rate=48000 ch=2 spc=1600 fnv1a64=1acde7fe23244955
+video ts=309999690 80x45 codec=UYVA flags=10 cs=709 rate=30/1 meta="\xAF\x0E\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC"
+pixels \xAF\x0E\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=12293bce722d49f5 stride=160
+audio ts=309999690 rate=48000 ch=2 spc=1600 fnv1a64=0b8b33fa8cc550b0
+audio ts=310333023 rate=48000 ch=2 spc=1600 fnv1a64=25fea378c87cc772
+audio ts=310666356 rate=48000 ch=2 spc=1600 fnv1a64=21ca9c2573e596f1
+audio ts=310999689 rate=48000 ch=2 spc=1600 fnv1a64=a0bb674e229d5dd5
+audio ts=311333022 rate=48000 ch=2 spc=1600 fnv1a64=9fa34ba53484be8e
+audio ts=311666355 rate=48000 ch=2 spc=1600 fnv1a64=bde30bed7edcd177
+audio ts=311999688 rate=48000 ch=2 spc=1600 fnv1a64=b0b91cece07a33c0
+audio ts=312333021 rate=48000 ch=2 spc=1600 fnv1a64=b34ec3de1c02e0fe
+audio ts=312666354 rate=48000 ch=2 spc=1600 fnv1a64=27fd76ffe2bea846
+audio ts=312999687 rate=48000 ch=2 spc=1600 fnv1a64=e6751aa8f2d7c773
+audio ts=313333020 rate=48000 ch=2 spc=1600 fnv1a64=df0ca717288ed668
+audio ts=313666353 rate=48000 ch=2 spc=1600 fnv1a64=18f1e9d7cb6bf2a7
+audio ts=313999686 rate=48000 ch=2 spc=1600 fnv1a64=50f671732f1943ea
+audio ts=314333019 rate=48000 ch=2 spc=1600 fnv1a64=9fd0620db146e8b4
+audio ts=314666352 rate=48000 ch=2 spc=1600 fnv1a64=d615e371a63cf281
+audio ts=314999685 rate=48000 ch=2 spc=1600 fnv1a64=1dde60cb158ff280
+audio ts=315333018 rate=48000 ch=2 spc=1600 fnv1a64=57effd24b63e7bea
+audio ts=315666351 rate=48000 ch=2 spc=1600 fnv1a64=9232f425682cc005
+audio ts=315999684 rate=48000 ch=2 spc=1600 fnv1a64=afe28d10dcdcc0a8
+audio ts=316333017 rate=48000 ch=2 spc=1600 fnv1a64=da09a81a7eeebf44
+audio ts=316666350 rate=48000 ch=2 spc=1600 fnv1a64=80a3f4a84d41407c
+audio ts=316999683 rate=48000 ch=2 spc=1600 fnv1a64=6d332fe1bb586253
+audio ts=317333016 rate=48000 ch=2 spc=1600 fnv1a64=40757a616a117198
+audio ts=317666349 rate=48000 ch=2 spc=1600 fnv1a64=f33539091fcaa326
+audio ts=317999682 rate=48000 ch=2 spc=1600 fnv1a64=b48066616320d4e2
+audio ts=318333015 rate=48000 ch=2 spc=1600 fnv1a64=6f3c161ff7ff0336
+audio ts=318666348 rate=48000 ch=2 spc=1600 fnv1a64=ea480b886aed523d
+audio ts=318999681 rate=48000 ch=2 spc=1600 fnv1a64=d5976123fb007555
+audio ts=319333014 rate=48000 ch=2 spc=1600 fnv1a64=cd1042cac70164c6
+audio ts=319666347 rate=48000 ch=2 spc=1600 fnv1a64=2f3954787db6ee8e
+video ts=319999680 80x45 codec=UYVA flags=10 cs=709 rate=30/1 meta="\xBF\x0E\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC"
+pixels \xBF\x0E\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=0159a93ded19a7d5 stride=160
+audio ts=319999680 rate=48000 ch=2 spc=1600 fnv1a64=92b935910c9c2b5f
+audio ts=320333013 rate=48000 ch=2 spc=1600 fnv1a64=50a227d2051c0ae7
+audio ts=320666346 rate=48000 ch=2 spc=1600 fnv1a64=2f54932cda2038e2
+audio ts=320999679 rate=48000 ch=2 spc=1600 fnv1a64=1a1f9aa484c9de68
+audio ts=321333012 rate=48000 ch=2 spc=1600 fnv1a64=504301fffaf2bda1
+audio ts=321666345 rate=48000 ch=2 spc=1600 fnv1a64=3c1ed22c4d311d09
+audio ts=321999678 rate=48000 ch=2 spc=1600 fnv1a64=1467069f97b5b676
+audio ts=322333011 rate=48000 ch=2 spc=1600 fnv1a64=3b6cae9a2f97185e
+audio ts=322666344 rate=48000 ch=2 spc=1600 fnv1a64=41cf6ad5949892f3
+audio ts=322999677 rate=48000 ch=2 spc=1600 fnv1a64=097d7fd48ea6d66f
+audio ts=323333010 rate=48000 ch=2 spc=1600 fnv1a64=41828210830aa3dc
+audio ts=323666343 rate=48000 ch=2 spc=1600 fnv1a64=4daae9dfafd3a368
+audio ts=323999676 rate=48000 ch=2 spc=1600 fnv1a64=dff64d2d278244b1
+audio ts=324333009 rate=48000 ch=2 spc=1600 fnv1a64=bba2087dd5d93577
+audio ts=324666342 rate=48000 ch=2 spc=1600 fnv1a64=ec210b9c2fbc3d03
+audio ts=324999675 rate=48000 ch=2 spc=1600 fnv1a64=6c43244a96388bf4
+audio ts=325333008 rate=48000 ch=2 spc=1600 fnv1a64=4548d7eb41115de0
+audio ts=325666341 rate=48000 ch=2 spc=1600 fnv1a64=cd7c323537a7e61a
+audio ts=325999674 rate=48000 ch=2 spc=1600 fnv1a64=a07733bec1b20b6a
+audio ts=326333007 rate=48000 ch=2 spc=1600 fnv1a64=727a1792b9e22a33
+audio ts=326666340 rate=48000 ch=2 spc=1600 fnv1a64=dbd3c76de9c8fdac
+audio ts=326999673 rate=48000 ch=2 spc=1600 fnv1a64=98307d80d211c3a6
+audio ts=327333006 rate=48000 ch=2 spc=1600 fnv1a64=07657fd15223e2bf
+audio ts=327666339 rate=48000 ch=2 spc=1600 fnv1a64=b6748cb2766c71ad
+audio ts=327999672 rate=48000 ch=2 spc=1600 fnv1a64=af8b828c6acc0b51
+audio ts=328333005 rate=48000 ch=2 spc=1600 fnv1a64=a61d50cbd87f1be0
+audio ts=328666338 rate=48000 ch=2 spc=1600 fnv1a64=4ee8d4db93bd6fd6
+audio ts=328999671 rate=48000 ch=2 spc=1600 fnv1a64=069f56f0b1f03c3a
+audio ts=329333004 rate=48000 ch=2 spc=1600 fnv1a64=06739913ba8b88a3
+audio ts=329666337 rate=48000 ch=2 spc=1600 fnv1a64=f0ac956d17b76338
+video ts=329999670 80x45 codec=UYVA flags=10 cs=709 rate=30/1 meta="d\x10\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC"
+pixels d\x10\x00\x00\xC5\x0A\xDA\x9D\xA8\xB6H\xE2\xC2\xC4\x15\xB4Y\x9A<S \xF8\xD2\xC2\xCC fnv1a64=629b77c07e118c45 stride=160
+audio ts=329999670 rate=48000 ch=2 spc=1600 fnv1a64=61dd936a0ad6c709
+audio ts=330333003 rate=48000 ch=2 spc=1600 fnv1a64=6b8a07894ebdfa2c
+audio ts=330666336 rate=48000 ch=2 spc=1600 fnv1a64=b8b58c97a47e012c
+audio ts=330999669 rate=48000 ch=2 spc=1600 fnv1a64=38b8d4702a2b72eb
+audio ts=331333002 rate=48000 ch=2 spc=1600 fnv1a64=6a213471d0c742b3
+audio ts=331666335 rate=48000 ch=2 spc=1600 fnv1a64=547a80486dda66ce
+audio ts=331999668 rate=48000 ch=2 spc=1600 fnv1a64=7fa1cc524628de36
+audio ts=332333001 rate=48000 ch=2 spc=1600 fnv1a64=733f7687ea6988b4
+audio ts=332666334 rate=48000 ch=2 spc=1600 fnv1a64=d41a47386f521cd7
+audio ts=332999667 rate=48000 ch=2 spc=1600 fnv1a64=98abce7ac1f0b31d
+done video=151 audio=150 ch0_rms=0.1769 ch1_silent=true

@@ -1,0 +1,2 @@
+snap-omt-send-10bit.png: 640x360 16-bit RGB; bottom row has 557 distinct green levels
+snap-libomtnet-p216.png: 640x360 16-bit RGB; bottom row has 409 distinct green levels

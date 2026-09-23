@@ -1,0 +1,13 @@
+connecting to 127.0.0.1:6400
+connected (Video channel) to 127.0.0.1:6400
+metadata: <OMTInfo ProductName="omt" Manufacturer="open-media-transport" Version="0.1.0" />
+sender says: Tally(Tally { preview: false, program: false })
+connected (Audio channel) to 127.0.0.1:6400
+metadata: <OMTInfo ProductName="omt" Manufacturer="open-media-transport" Version="0.1.0" />
+sender says: Tally(Tally { preview: false, program: false })
+sender says: Tally(Tally { preview: false, program: true })
+   1.0s  video 640x360 30.00 fps 10-bit | 29.0 fps received | 2.1 Mbit/s | audio 48000 Hz 2 ch, 3/31 frames with sound | decode errors 0
+   2.0s  video 640x360 30.00 fps 10-bit | 29.9 fps received | 2.2 Mbit/s | audio 48000 Hz 2 ch, 3/30 frames with sound | decode errors 0
+   3.0s  video 640x360 30.00 fps 10-bit | 30.0 fps received | 2.2 Mbit/s | audio 48000 Hz 2 ch, 3/31 frames with sound | decode errors 0
+   4.1s  video 640x360 30.00 fps 10-bit | 30.0 fps received | 2.2 Mbit/s | audio 48000 Hz 2 ch, 3/31 frames with sound | decode errors 0
+saved 640x360 snapshot to snap-omt-send-10bit.png (16-bit PNG from a 10-bit source)

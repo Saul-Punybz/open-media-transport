@@ -1,0 +1,123 @@
+log: 9/23/2026 9:59:13 AM,[OMTLogging],Log Started
+log: 9/23/2026 9:59:13 AM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/23/2026 9:59:13 AM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/23/2026 9:59:13 AM,[OMTDiscoveryDnsSd],RegisterAddress: SAULS-MACBOOK-PRO.LOCAL (decode-uyva)
+send address=SAULS-MACBOOK-PRO.LOCAL (decode-uyva) url=omt://SAULS-MACBOOK-PRO.LOCAL:6400 port=6400
+log: 9/23/2026 9:59:14 AM,[OMTDiscovery],AddIP: SAULS-MACBOOK-PRO.LOCAL (decode-uyva):6400,::1
+log: 9/23/2026 9:59:14 AM,[OMTDiscovery],AddIP: SAULS-MACBOOK-PRO.LOCAL (decode-uyva):6400,2607:fb90:cd8b:5d09:1c68:4c1e:f4f9:3784
+log: 9/23/2026 9:59:16 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:16 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52507
+log: 9/23/2026 9:59:16 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:16 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52508
+send tally preview=0 program=1
+log: 9/23/2026 9:59:16 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:16 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52509
+log: 9/23/2026 9:59:16 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:16 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52510
+log: 9/23/2026 9:59:21 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:21 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:21 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:21 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:21 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:21 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:21 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:21 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:21 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:21 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52511
+log: 9/23/2026 9:59:21 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:21 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52512
+log: 9/23/2026 9:59:21 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:21 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52513
+log: 9/23/2026 9:59:21 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:21 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52514
+log: 9/23/2026 9:59:26 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:26 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:26 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:26 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:26 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:26 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:26 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:26 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:26 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:26 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52515
+log: 9/23/2026 9:59:26 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:26 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52516
+log: 9/23/2026 9:59:26 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:26 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52517
+log: 9/23/2026 9:59:26 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:26 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52518
+log: 9/23/2026 9:59:31 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:31 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:31 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:31 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:31 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:31 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:31 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:31 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:31 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:31 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52519
+log: 9/23/2026 9:59:31 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:31 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52520
+log: 9/23/2026 9:59:31 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:31 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52521
+log: 9/23/2026 9:59:31 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:31 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52522
+log: 9/23/2026 9:59:36 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:36 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:36 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:36 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:36 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:36 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:36 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:36 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:36 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:36 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52523
+log: 9/23/2026 9:59:36 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:36 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52524
+log: 9/23/2026 9:59:36 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:36 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52525
+log: 9/23/2026 9:59:36 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:36 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52526
+log: 9/23/2026 9:59:41 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:41 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:41 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:41 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:41 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:41 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:41 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:41 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:41 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:41 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52537
+log: 9/23/2026 9:59:41 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:41 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52538
+log: 9/23/2026 9:59:41 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:41 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52539
+log: 9/23/2026 9:59:41 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:41 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52540
+log: 9/23/2026 9:59:46 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:46 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:46 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:46 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:46 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:46 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:46 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:46 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:46 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:46 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52541
+log: 9/23/2026 9:59:46 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:46 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52542
+log: 9/23/2026 9:59:46 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:46 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52543
+log: 9/23/2026 9:59:46 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 9:59:46 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52544
+log: 9/23/2026 9:59:51 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:51 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 9:59:51 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:51 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:51 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:51 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 9:59:51 AM,[OMTChannel.Receive],SocketClosing: ConnectionReset,0
+log: 9/23/2026 9:59:51 AM,[OMTSend.RemoveChannel],RemoveConnection
+send tally preview=0 program=0
+send done connections=0
+log: 9/23/2026 10:00:06 AM,[OMTDiscoveryDnsSd],DeRegisterAddress: SAULS-MACBOOK-PRO.LOCAL (decode-uyva)

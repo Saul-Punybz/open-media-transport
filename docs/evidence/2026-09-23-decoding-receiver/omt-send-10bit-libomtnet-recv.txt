@@ -1,0 +1,27 @@
+log: 9/23/2026 10:01:11 AM,[OMTLogging],Log Started
+log: 9/23/2026 10:01:11 AM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/23/2026 10:01:11 AM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/23/2026 10:01:11 AM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+log: 9/23/2026 10:01:11 AM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+log: 9/23/2026 10:01:11 AM,[OMTDiscovery],New: SAULS-MACBOOK-PRO.LOCAL (decode-10bit):6400
+log: 9/23/2026 10:01:11 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 10:01:11 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (decode-10bit):6400,192.0.0.2
+log: 9/23/2026 10:01:11 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (decode-10bit):6400,2607:fb90:cd8b:5d09:d833:ad4e:5ea:165
+log: 9/23/2026 10:01:11 AM,[OMTDiscovery],NewIP: SAULS-MACBOOK-PRO.LOCAL (decode-10bit):6400,2607:fb90:cd8b:5d09:1c68:4c1e:f4f9:3784
+recv metadata ts=0 len=82 xml="<OMTInfo ProductName=\x22omt\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1.0\x22 />\x00"
+log: 9/23/2026 10:01:11 AM,[OMTReceive.Connect],Connected.Audio: omt://127.0.0.1:6400
+log: 9/23/2026 10:01:11 AM,[OMTChannel],KeepAlive.Enabled
+recv metadata ts=0 len=82 xml="<OMTInfo ProductName=\x22omt\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1.0\x22 />\x00"
+log: 9/23/2026 10:01:11 AM,[OMTReceive.Connect],Connected.Video: omt://127.0.0.1:6400
+recv video ts=17333316 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=7798 meta=""
+recv audio ts=17333316 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=27333306 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=7900 meta=""
+recv audio ts=27333306 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=37333296 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=7798 meta=""
+recv audio ts=37333296 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=47333286 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=7900 meta=""
+recv audio ts=47333286 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv audio ts=57333276 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=57333276 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=7798 meta=""
+recv video ts=67333266 640x360 codec=P216 flags=16 cs=709 rate=30/1 compressed=7900 meta=""
+recv done video=151 audio=150 info=omt/open-media-transport/0.1.0

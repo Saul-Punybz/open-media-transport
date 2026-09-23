@@ -1,0 +1,24 @@
+p216-full-BGRA                           video 5/5 identical (libomtnet ['640x360 BGRA'], ours ['640x360 BGRA']); audio 5/5 identical
+p216-full-P216                           video 5/5 identical (libomtnet ['640x360 P216'], ours ['640x360 P216']); audio 5/5 identical
+p216-full-UYVY                           video 5/5 identical (libomtnet ['640x360 UYVY'], ours ['640x360 UYVY']); audio 5/5 identical
+p216-full-UYVYorUYVAorP216orPA16         video 4/4 identical (libomtnet ['640x360 P216'], ours ['640x360 P216']); audio 5/5 identical
+p216-preview-UYVYorUYVAorP216orPA16      video 5/5 identical (libomtnet ['80x45 UYVY'], ours ['80x45 UYVY']); audio 5/5 identical
+pa16-full-P216                           video 5/5 identical (libomtnet ['640x360 P216'], ours ['640x360 P216']); audio 5/5 identical
+pa16-full-UYVYorBGRA                     video 5/5 identical (libomtnet ['640x360 BGRA'], ours ['640x360 BGRA']); audio 5/5 identical
+pa16-full-UYVYorUYVA                     video 5/5 identical (libomtnet ['640x360 UYVA'], ours ['640x360 UYVA']); audio 5/5 identical
+pa16-full-UYVYorUYVAorP216orPA16         video 4/4 identical (libomtnet ['640x360 PA16'], ours ['640x360 PA16']); audio 5/5 identical
+pa16-preview-BGRA                        video 5/5 identical (libomtnet ['80x45 BGRA'], ours ['80x45 BGRA']); audio 5/5 identical
+uyva-full-BGRA                           video 5/5 identical (libomtnet ['640x360 BGRA'], ours ['640x360 BGRA']); audio 5/5 identical
+uyva-full-UYVY                           video 5/5 identical (libomtnet ['640x360 UYVY'], ours ['640x360 UYVY']); audio 5/5 identical
+uyva-full-UYVYorBGRA                     video 5/5 identical (libomtnet ['640x360 BGRA'], ours ['640x360 BGRA']); audio 5/5 identical
+uyva-full-UYVYorUYVA                     video 4/4 identical (libomtnet ['640x360 UYVA'], ours ['640x360 UYVA']); audio 5/5 identical
+uyva-full-UYVYorUYVAorP216orPA16         video 5/5 identical (libomtnet ['640x360 UYVA'], ours ['640x360 UYVA']); audio 5/5 identical
+uyva-preview-BGRA                        video 5/5 identical (libomtnet ['80x45 BGRA'], ours ['80x45 BGRA']); audio 5/5 identical
+uyva-preview-UYVYorUYVA                  video 5/5 identical (libomtnet ['80x45 UYVA'], ours ['80x45 UYVA']); audio 5/5 identical
+uyvy-full-BGRA                           video 5/5 identical (libomtnet ['640x360 BGRA'], ours ['640x360 BGRA']); audio 5/5 identical
+uyvy-full-P216                           video 5/5 identical (libomtnet ['640x360 P216'], ours ['640x360 P216']); audio 5/5 identical
+uyvy-full-UYVY                           video 5/5 identical (libomtnet ['640x360 UYVY'], ours ['640x360 UYVY']); audio 4/4 identical
+uyvy-full-UYVYorBGRA                     video 5/5 identical (libomtnet ['640x360 UYVY'], ours ['640x360 UYVY']); audio 5/5 identical
+uyvy-preview-BGRA                        video 5/5 identical (libomtnet ['80x45 BGRA'], ours ['80x45 BGRA']); audio 5/5 identical
+uyvy-preview-UYVY                        video 5/5 identical (libomtnet ['80x45 UYVY'], ours ['80x45 UYVY']); audio 5/5 identical
+ALL IDENTICAL

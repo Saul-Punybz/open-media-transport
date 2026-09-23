@@ -1,0 +1,12 @@
+snap-libomtnet-p216.png: PNG image data, 640 x 360, 16-bit/color RGB, non-interlaced
+  bitsPerSample: 16
+  hasAlpha: no
+snap-omt-send-10bit.png: PNG image data, 640 x 360, 16-bit/color RGB, non-interlaced
+  bitsPerSample: 16
+  hasAlpha: no
+snap-libomtnet-uyvy.bmp: PC bitmap, Windows 3.x format, 640 x 360 x 24, cbSize 691254, bits offset 54
+  bitsPerSample: 8
+  hasAlpha: no
+snap-omt-send-10bit.bmp: PC bitmap, Windows 3.x format, 640 x 360 x 24, cbSize 691254, bits offset 54
+  bitsPerSample: 8
+  hasAlpha: no

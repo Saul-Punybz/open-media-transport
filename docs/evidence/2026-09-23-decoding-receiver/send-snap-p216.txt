@@ -1,0 +1,17 @@
+log: 9/23/2026 10:01:22 AM,[OMTLogging],Log Started
+log: 9/23/2026 10:01:22 AM,[OMTDiscoveryDnsSd],BeginDispatcher
+log: 9/23/2026 10:01:22 AM,[OMTDiscoveryDnsSd],BeginDNSBrowse.OK
+log: 9/23/2026 10:01:22 AM,[OMTDiscoveryDnsSd],RegisterAddress: SAULS-MACBOOK-PRO.LOCAL (decode-snap-p216)
+send address=SAULS-MACBOOK-PRO.LOCAL (decode-snap-p216) url=omt://SAULS-MACBOOK-PRO.LOCAL:6400 port=6400
+log: 9/23/2026 10:01:23 AM,[OMTDiscovery],AddIP: SAULS-MACBOOK-PRO.LOCAL (decode-snap-p216):6400,::1
+log: 9/23/2026 10:01:23 AM,[OMTDiscovery],AddIP: SAULS-MACBOOK-PRO.LOCAL (decode-snap-p216):6400,2607:fb90:cd8b:5d09:1c68:4c1e:f4f9:3784
+log: 9/23/2026 10:01:25 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 10:01:25 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52580
+log: 9/23/2026 10:01:25 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/23/2026 10:01:25 AM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:52581
+log: 9/23/2026 10:01:28 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 10:01:28 AM,[OMTChannel.Receive],SocketClosing: Success,0
+log: 9/23/2026 10:01:28 AM,[OMTSend.RemoveChannel],RemoveConnection
+log: 9/23/2026 10:01:28 AM,[OMTSend.RemoveChannel],RemoveConnection
+send done connections=0
+log: 9/23/2026 10:01:30 AM,[OMTDiscoveryDnsSd],DeRegisterAddress: SAULS-MACBOOK-PRO.LOCAL (decode-snap-p216)

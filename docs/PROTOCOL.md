@@ -234,7 +234,7 @@ supplies.
 | V3 | Encoder profile: `Default` means `OMT_SQ` (166). A receiver's suggested quality chooses `OMT_LQ` (133), `OMT_SQ` or `OMT_HQ` (199) when the sender's own quality is `Default`; the highest suggestion among video connections wins. | `codecs/OMTVMX1Codec.cs:105`, `OMTSend.cs:511-519,486-507` | |
 | V4 | Opaque BGRA is encoded with `VMX_EncodeBGRA`, not `VMX_EncodeBGRX`, even though the "BGRX" image type is chosen. | `OMTSend.cs:702-710`, `codecs/OMTVMX1Codec.cs:164-169` | |
 | V5 | UYVA without the alpha flag is encoded as UYVY; PA16 without alpha as P216. | `OMTSend.cs:712-733` | |
-| V6 | The receiver picks the decode format from the flags and its preferred format; alpha frames decode to BGRA/UYVA/PA16 only when asked. | `OMTReceive.cs:773-950` | |
+| V6 | The receiver picks the decode format from the flags and its preferred format; alpha frames decode to BGRA/UYVA/PA16 only when asked. | `OMTReceive.cs:773-950` | 2026-09-23 [D](evidence/2026-09-23-decoding-receiver/README.md) |
 
 V4 means upstream's bitstream for opaque BGRA sources carries data from the source's
 alpha bytes (libvmx sets `VMX_IMAGE_BGRA`, `reference/libvmx/src/vmxcodec.cpp:1811`)
@@ -265,7 +265,7 @@ fixes it (real metadata after the prefix), and libomtnet's receiver reads that c
 |---|---|---|---|
 | A1 | 32-bit float samples, planar: all samples of channel 0, then channel 1, … | `OMTPublicTypes.cs:344-355` | |
 | A2 | Channels whose samples are all zero bytes are left out of the data and their bit is cleared in `ActiveChannels`. | `codecs/OMTFPA1Codec.cs:68-86` |  2026-09-21 [L] |
-| A3 | The receiver re-inserts silent channels as zeros, so it always outputs `Channels` planes. | `codecs/OMTFPA1Codec.cs:39-59` | |
+| A3 | The receiver re-inserts silent channels as zeros, so it always outputs `Channels` planes. | `codecs/OMTFPA1Codec.cs:39-59` | 2026-09-23 [D](evidence/2026-09-23-decoding-receiver/README.md) |
 | A4 | Receivers reject `SamplesPerChannel × Channels × 4 > 1 MiB`. | `OMTReceive.cs:1082-1113` | |
 
 **Upstream bug, harmless on the wire.** `OMTActiveAudioChannels.C32` is

@@ -14,6 +14,10 @@ the MIT license. Video uses the [`vmx-codec`](../vmx-codec) crate.
   a malformed peer produces an error instead of a stalled connection
 - `receiver` — a minimal blocking receiver that connects the way libomtnet does
 - `sender` — listens, answers receivers' commands, encodes VMX1 with `vmx-codec`
+- `media` — turns received frames into decoded video (UYVY, UYVA, BGRA, P216,
+  PA16, chosen with libomtnet's preferred-format rules), planar f32 audio and
+  metadata XML, reusing buffers; its output matches libomtnet's byte for byte
+  (`docs/evidence/2026-09-23-decoding-receiver`)
 - `discovery` — announce and browse `_omt._tcp` over mDNS, with libomtnet's naming
 - `discovery_server` — the discovery server and its client, for networks without
   multicast; `Discovery::with_server` uses one instead of mDNS for announcing
