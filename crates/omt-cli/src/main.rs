@@ -2,8 +2,8 @@
 //!
 //! ```text
 //! omt list [--seconds N]
-//! omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE]
-//! omt recv SOURCE [--seconds N] [--snapshot FILE.bmp] [--preview]
+//! omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE] [--10bit]
+//! omt recv SOURCE [--seconds N] [--snapshot FILE.bmp|FILE.png] [--preview]
 //! omt discovery-server [--port N] [--seconds N]
 //! ```
 //!
@@ -17,7 +17,7 @@
 mod image;
 
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter, Write};
 use std::net::ToSocketAddrs;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -29,9 +29,10 @@ use open_media_transport::command::{classify, Message, Quality};
 use open_media_transport::discovery::{Discovery, SourceEvent};
 use open_media_transport::discovery_server::{self, Server, ServerEvent};
 use open_media_transport::frame::{ExtendedHeader, VideoFlags};
+use open_media_transport::media::{MediaDecoder, PreferredVideoFormat, VideoFrame};
 use open_media_transport::receiver::{Event, Receiver, ReceiverConfig};
 use open_media_transport::sender::{Sender, SenderConfig, SenderInfo, VideoParams};
-use vmx_codec::{Decoder, Frame, PixelFormat};
+use vmx_codec::{Frame, PixelFormat};
 
 const USAGE: &str = "\
 omt — Open Media Transport test tool (open-media-transport for Rust)
@@ -39,14 +40,16 @@ omt — Open Media Transport test tool (open-media-transport for Rust)
 USAGE:
   omt list [--seconds N]
       Show the OMT sources on the network (default 5 s).
-  omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE]
+  omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE] [--10bit]
       Send colour bars with a moving box and a 1 kHz beep once a second.
       Defaults: --name \"Test Pattern\" --size 1280x720 --fps 30, until Ctrl-C.
       --redirect tells receivers to use SOURCE instead (a virtual source).
-  omt recv SOURCE [--seconds N] [--snapshot FILE.bmp] [--preview]
+      --10bit sends a 10-bit (P216) source instead of 8-bit UYVY.
+  omt recv SOURCE [--seconds N] [--snapshot FILE.bmp|FILE.png] [--preview]
       Connect to SOURCE (a name from `omt list`, omt://host:port, or
       host:port), print statistics every second, and optionally save the
-      last frame. Follows redirects.
+      last frame: .png keeps 10-bit sources at 16 bits per sample and keeps
+      alpha; .bmp is 8-bit RGB. Follows redirects.
   omt discovery-server [--port N] [--seconds N]
       Run a discovery server for networks without multicast (default port
       6399), printing each client and source as it comes and goes.
@@ -168,6 +171,7 @@ fn send(args: &[String]) -> Result<()> {
     let (fps_n, fps_d) = parse_fps(opt(args, "--fps").unwrap_or("30"))?;
     let fps = fps_n as f64 / fps_d as f64;
     let limit = seconds(args)?.map(Duration::from_secs);
+    let ten_bit = args.iter().any(|a| a == "--10bit");
 
     let mut config = SenderConfig::new(name);
     config.discovery_server = opt(args, "--discovery-server").map(str::to_owned);
@@ -178,9 +182,10 @@ fn send(args: &[String]) -> Result<()> {
     });
     let tx = Sender::new(config).map_err(|e| format!("cannot start sender: {e}"))?;
     println!(
-        "sending \"{}\" on port {} — {w}x{h} at {fps:.2} fps. Ctrl-C to stop.",
+        "sending \"{}\" on port {} — {w}x{h}{} at {fps:.2} fps. Ctrl-C to stop.",
         tx.full_name().unwrap_or(name),
-        tx.port()
+        tx.port(),
+        if ten_bit { " 10-bit" } else { "" }
     );
     if let Some(to) = opt(args, "--redirect") {
         tx.set_redirect(Some(to));
@@ -198,7 +203,12 @@ fn send(args: &[String]) -> Result<()> {
         premultiplied: false,
     };
     let rate = 48_000usize;
-    let mut frame = Frame::new(w, h, PixelFormat::Uyvy);
+    let format = if ten_bit {
+        PixelFormat::P216
+    } else {
+        PixelFormat::Uyvy
+    };
+    let mut frame = Frame::new(w, h, format);
     let (mut vclock, mut aclock) = (Clock::new(), Clock::new());
     let start = Instant::now();
     let mut last_report = Instant::now();
@@ -208,7 +218,12 @@ fn send(args: &[String]) -> Result<()> {
         if limit.is_some_and(|l| start.elapsed() >= l) {
             break;
         }
-        image::fill_test_pattern(&mut frame.planes[0].data, w, h, n, fps);
+        if ten_bit {
+            let (luma, chroma) = frame.planes.split_at_mut(1);
+            image::fill_test_pattern_p216(&mut luma[0].data, &mut chroma[0].data, w, h, n, fps);
+        } else {
+            image::fill_test_pattern(&mut frame.planes[0].data, w, h, n, fps);
+        }
         let ts = vclock.video(fps_n, fps_d);
         tx.send_video(&frame, params, ts, b"")
             .map_err(|e| format!("encode: {e}"))?;
@@ -309,8 +324,10 @@ fn recv(args: &[String]) -> Result<()> {
     let mut tick = Instant::now();
     let mut last_video = String::from("-");
     let mut last_audio = String::from("-");
-    let mut decoder: Option<(i32, i32, Decoder)> = None;
-    let mut last_frame: Option<(Vec<u8>, usize, usize, usize, bool)> = None;
+    // Keeps alpha and 10-bit depth for the snapshot (`OMTReceive.cs:839-887`).
+    let mut decoder = MediaDecoder::new(PreferredVideoFormat::UyvyOrUyvaOrP216OrPa16);
+    let mut last_frame = VideoFrame::default();
+    let mut have_frame = false;
     let mut decode_errors = 0u32;
     let mut decode_due = true;
 
@@ -374,43 +391,9 @@ fn recv(args: &[String]) -> Result<()> {
                         // feeds --snapshot, without the CPU cost of every frame.
                         if decode_due {
                             decode_due = false;
-                            let (w, h) = (v.width, v.height);
-                            if decoder.as_ref().map(|d| (d.0, d.1)) != Some((w, h)) {
-                                decoder =
-                                    Decoder::new(w as usize, h as usize).ok().map(|d| (w, h, d));
-                            }
-                            let bt601 = v.color_space == 601 || (v.color_space == 0 && h < 720);
-                            match decoder.as_mut() {
-                                Some((_, _, dec)) if fl.contains(VideoFlags::PREVIEW) => {
-                                    match dec.decode_preview(&f.data, false) {
-                                        Ok(p) => {
-                                            last_frame = Some((
-                                                planar_to_uyvy(&p),
-                                                p.width * 2,
-                                                p.width,
-                                                p.height,
-                                                bt601,
-                                            ))
-                                        }
-                                        Err(_) => decode_errors += 1,
-                                    }
-                                }
-                                // 10-bit streams: snapshot not supported yet.
-                                Some(_) if fl.contains(VideoFlags::HIGH_BIT_DEPTH) => {}
-                                Some((_, _, dec)) => match dec.decode(&f.data, PixelFormat::Uyvy) {
-                                    Ok(p) => {
-                                        let pl = &p.planes[0];
-                                        last_frame = Some((
-                                            pl.data.clone(),
-                                            pl.stride,
-                                            p.width,
-                                            p.height,
-                                            bt601,
-                                        ));
-                                    }
-                                    Err(_) => decode_errors += 1,
-                                },
-                                None => decode_errors += 1,
+                            match decoder.decode_video(&f, &mut last_frame) {
+                                Ok(()) => have_frame = true,
+                                Err(_) => decode_errors += 1,
                             }
                         }
                     }
@@ -443,15 +426,27 @@ fn recv(args: &[String]) -> Result<()> {
     }
 
     if let Some(path) = snapshot {
-        match last_frame {
-            Some((px, stride, w, h, bt601)) => {
-                let file = File::create(path).map_err(|e| format!("{path}: {e}"))?;
-                image::write_bmp(&mut BufWriter::new(file), &px, stride, w, h, bt601)
-                    .map_err(|e| format!("{path}: {e}"))?;
-                println!("saved {w}x{h} snapshot to {path}");
-            }
-            None => println!("no video frame decoded; no snapshot written"),
+        if !have_frame {
+            println!("no video frame decoded; no snapshot written");
+            return Ok(());
         }
+        let img = image::to_rgb(&last_frame);
+        let mut file = BufWriter::new(File::create(path).map_err(|e| format!("{path}: {e}"))?);
+        let png = path.to_ascii_lowercase().ends_with(".png");
+        if png {
+            image::write_png(&mut file, &img).map_err(|e| format!("{path}: {e}"))?;
+        } else {
+            image::write_bmp(&mut file, &img).map_err(|e| format!("{path}: {e}"))?;
+        }
+        file.flush().map_err(|e| format!("{path}: {e}"))?;
+        let (w, h) = (last_frame.width, last_frame.height);
+        let depth = match (png, img.high_bit_depth) {
+            (true, true) => "16-bit PNG from a 10-bit source",
+            (true, false) => "8-bit PNG",
+            (false, true) => "8-bit BMP from a 10-bit source (use .png to keep the depth)",
+            (false, false) => "8-bit BMP",
+        };
+        println!("saved {w}x{h} snapshot to {path} ({depth})");
     }
     Ok(())
 }
@@ -484,21 +479,4 @@ fn serve_discovery(args: &[String]) -> Result<()> {
         }
     }
     Ok(())
-}
-
-/// Packs a `Yuv422p` frame (what `decode_preview` returns) as UYVY.
-fn planar_to_uyvy(f: &Frame) -> Vec<u8> {
-    let (yp, up, vp) = (&f.planes[0], &f.planes[1], &f.planes[2]);
-    let mut out = Vec::with_capacity(f.width * 2 * f.height);
-    for y in 0..f.height {
-        for x in (0..f.width).step_by(2) {
-            out.extend_from_slice(&[
-                up.data[y * up.stride + x / 2],
-                yp.data[y * yp.stride + x],
-                vp.data[y * vp.stride + x / 2],
-                yp.data[y * yp.stride + x + 1],
-            ]);
-        }
-    }
-    out
 }

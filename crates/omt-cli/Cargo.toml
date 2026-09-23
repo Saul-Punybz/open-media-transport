@@ -17,3 +17,4 @@ path = "src/main.rs"
 [dependencies]
 open-media-transport = { path = "../open-media-transport", version = "0.1" }
 vmx-codec = { path = "../vmx-codec", version = "0.1" }
+png = "0.18"
