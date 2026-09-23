@@ -16,9 +16,13 @@ for very fast software encoding and decoding:
 - slices of 16 lines, each coded on its own, so work splits cleanly across threads
 
 This crate is a **port of [libvmx](https://github.com/openmediatransport/libvmx)**,
-the MIT-licensed C++ reference implementation. It is written in safe Rust
-(`#![forbid(unsafe_code)]`), has no dependencies, and matches libvmx
-byte for byte (see [Conformance](#conformance)).
+the MIT-licensed C++ reference implementation. It has no dependencies and
+matches libvmx byte for byte (see [Conformance](#conformance)). It is safe
+Rust except for one module, `simd`, which implements the transform's 128-bit
+operations with `std::arch` NEON (aarch64) or SSE2 (x86-64) intrinsics
+(`#![deny(unsafe_code)]` everywhere else). The same operations also exist as
+portable Rust, used on other targets and as the reference the SIMD versions
+are tested against.
 
 ## Usage
 
@@ -109,7 +113,8 @@ progressive and interlaced:
 
 The reference is libvmx's 128-bit SIMD path (SSE on x86-64, NEON via
 sse2neon on ARM). libvmx has no plain scalar C path. Its AVX2 path is not
-tested here, because the test machine is ARM.
+tested here. The unit tests also check this crate's NEON / SSE2 kernels
+against its portable ones on random and extreme inputs.
 
 To run the tests, place a checkout of libvmx at `reference/libvmx` (or set
 `LIBVMX_SRC` to its `src` directory). Without it, the conformance tests skip
@@ -121,9 +126,8 @@ themselves.
   entropy coding, 8-bit and 10-bit, alpha, interlaced frames, rate control,
   DC-only preview decoding, and UYVY / YUY2 / UYVA / P216 / PA16 / planar 4:2:2,
   plus NV12 / I420 input.
-- **Not yet:** BGRA/BGRX input and output (libvmx's RGB↔YUV conversion), SIMD
-  kernels (the code is portable scalar Rust that the compiler can
-  auto-vectorise), and the libvmx helpers `BGRXToUYVY` and `CalculatePSNR`.
+- **Not yet:** BGRA/BGRX input and output (libvmx's RGB↔YUV conversion), an
+  AVX2 path, and the libvmx helpers `BGRXToUYVY` and `CalculatePSNR`.
 - **Differences from libvmx:** At some sizes, libvmx's packed-to-planar
   conversion copies uninitialised memory into the padding rows or columns of
   its internal planes. This happens with UYVY/YUY2 rows that are not a

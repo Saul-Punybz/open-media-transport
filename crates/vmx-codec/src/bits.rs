@@ -431,8 +431,7 @@ mod tests {
             while bits.len() % 8 != 0 {
                 bits.push(false);
             }
-            let want: Vec<u8> =
-                bits.chunks(8).map(|c| c.iter().fold(0u8, |acc, &b| (acc << 1) | b as u8)).collect();
+            let want: Vec<u8> = bits.chunks(8).map(|c| c.iter().fold(0u8, |acc, &b| (acc << 1) | b as u8)).collect();
             assert_eq!(w.into_bytes(), want);
         }
     }

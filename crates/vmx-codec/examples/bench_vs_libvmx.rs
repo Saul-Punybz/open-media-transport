@@ -1,4 +1,4 @@
-//! Encode/decode throughput of vmx-codec (portable scalar Rust) against the
+//! Encode/decode throughput of vmx-codec (NEON / SSE2 kernels) against the
 //! libvmx C++ reference (128-bit SIMD path: NEON via sse2neon on ARM, SSE on
 //! x86-64), 1920x1080 UYVY 8-bit, one thread each.
 //!
@@ -67,7 +67,7 @@ fn main() {
         let r_dec = fps(frames, t.elapsed().as_secs_f64());
 
         if !libvmx_ref::AVAILABLE {
-            println!("rust scalar: encode {r_enc:.1} fps, decode {r_dec:.1} fps ({} bytes/frame)", packet.len());
+            println!("vmx-codec: encode {r_enc:.1} fps, decode {r_dec:.1} fps ({} bytes/frame)", packet.len());
             println!("libvmx reference not built; skipping C numbers");
             continue;
         }
@@ -90,7 +90,7 @@ fn main() {
         let c_dec = fps(frames, t.elapsed().as_secs_f64());
 
         println!("frame size: {} bytes ({:.0} Mbit/s at 60 fps)", packet.len(), packet.len() as f64 * 8.0 * 60.0 / 1e6);
-        println!("rust scalar : encode {r_enc:7.1} fps   decode {r_dec:7.1} fps");
+        println!("vmx-codec   : encode {r_enc:7.1} fps   decode {r_dec:7.1} fps");
         println!("libvmx SIMD : encode {c_enc:7.1} fps   decode {c_dec:7.1} fps");
         println!("ratio (C/Rust): encode {:.2}x   decode {:.2}x", c_enc / r_enc, c_dec / r_dec);
     }
