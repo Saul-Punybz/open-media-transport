@@ -161,7 +161,7 @@ impl Drop for Watcher {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(h) = self.thread.take() {
-            let _ = h.join();
+            crate::sender::join_bounded(h, std::time::Instant::now() + crate::sender::DROP_TIMEOUT);
         }
     }
 }
@@ -285,6 +285,8 @@ mod tests {
                 "redirect events"
             );
             assert_eq!(rx.redirect(), None);
+            let stats = rx.stats();
+            assert_eq!((stats.redirects, stats.reconnects), (3, 0));
         }
 
         #[test]

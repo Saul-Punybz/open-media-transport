@@ -15,7 +15,16 @@
 //! - never blocks on a slow receiver: each connection has at most 4 video or
 //!   audio frames and 64 metadata frames queued, and drops beyond that, as
 //!   libomtnet's send pools do (`OMTChannel.cs:207-218`, `OMTConstants.cs:46,51`);
-//! - can redirect its receivers to another source (§9, [`Sender::set_redirect`]).
+//! - can redirect its receivers to another source (§9, [`Sender::set_redirect`]);
+//! - can forward a frame that is already VMX1-compressed without touching it
+//!   (V2, P4, [`Sender::send_encoded_video`]).
+//!
+//! Many senders can share one [`Discovery`] ([`SenderConfig::discovery`]),
+//! so a process with many sources runs a single mDNS responder.
+//!
+//! Dropping a sender shuts its sockets down first and waits a bounded time
+//! for its threads ([`DROP_TIMEOUT`]); a thread still stuck after that is
+//! left to finish on its own rather than hang the caller.
 //!
 //! Deliberate differences: libomtnet's preview frames carry VMX bytes where
 //! per-frame metadata should be (U2). Here the metadata follows the preview
@@ -33,7 +42,8 @@ use std::ops::RangeInclusive;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex, Weak};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use std::{error, fmt};
 
 use socket2::{Domain, Protocol, Socket, Type};
 use vmx_codec::{Decoder, Encoder, EncoderConfig, Profile};
@@ -55,6 +65,88 @@ pub const MAX_FRAME_LEN: usize = 10_485_760;
 const MAX_QUEUED_AV: usize = 4;
 const MAX_QUEUED_METADATA: usize = 64;
 const MAX_UNREAD_METADATA: usize = 60;
+/// libomtnet refuses audio whose planar float data exceeds 1 MiB
+/// (`OMTSend.cs:800-806`, `OMTConstants.cs:62`).
+pub const MAX_AUDIO_DATA_LEN: usize = 1_048_576;
+/// How long dropping a [`Sender`] or a [`crate::receiver::Receiver`] waits
+/// for its threads after shutting its sockets down.
+pub const DROP_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Why a frame could not be sent. Frames that are valid but cannot be queued
+/// (a full queue, a frame over [`MAX_FRAME_LEN`]) are not errors: they are
+/// counted as dropped ([`SenderStats`]), as libomtnet does.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SendError {
+    /// The VMX encoder rejected the frame.
+    Codec(vmx_codec::Error),
+    /// Audio channel count outside 1..=32 (`OMTSend.cs:800`).
+    InvalidChannels(usize),
+    /// The sample count is not a multiple of the channel count.
+    SamplesNotMultipleOfChannels {
+        /// Samples given.
+        samples: usize,
+        /// Channels given.
+        channels: usize,
+    },
+    /// No samples, or a sample rate that is not positive (`OMTSend.cs:800`).
+    EmptyAudio,
+    /// Planar float data over [`MAX_AUDIO_DATA_LEN`] (`OMTSend.cs:802-806`).
+    AudioTooLarge(usize),
+    /// A pre-encoded frame with no data (`OMTSend.cs:768,782-785`).
+    EmptyVideo,
+    /// Width or height is zero or does not fit the header.
+    InvalidDimensions {
+        /// Width given.
+        width: usize,
+        /// Height given.
+        height: usize,
+    },
+    /// Per-frame metadata over 65535 bytes, the most `MetadataLength` holds (§3.1).
+    MetadataTooLarge(usize),
+}
+
+impl fmt::Display for SendError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SendError::Codec(e) => write!(f, "VMX encoder: {e}"),
+            SendError::InvalidChannels(n) => write!(f, "{n} audio channels; 1 to 32 allowed"),
+            SendError::SamplesNotMultipleOfChannels { samples, channels } => {
+                write!(
+                    f,
+                    "{samples} samples is not a multiple of {channels} channels"
+                )
+            }
+            SendError::EmptyAudio => write!(f, "no audio samples or no sample rate"),
+            SendError::AudioTooLarge(n) => write!(
+                f,
+                "{n} bytes of audio exceeds the {MAX_AUDIO_DATA_LEN}-byte limit"
+            ),
+            SendError::EmptyVideo => write!(f, "empty VMX1 frame"),
+            SendError::InvalidDimensions { width, height } => {
+                write!(f, "invalid frame size {width}x{height}")
+            }
+            SendError::MetadataTooLarge(n) => {
+                write!(f, "{n} bytes of per-frame metadata exceeds 65535")
+            }
+        }
+    }
+}
+
+impl error::Error for SendError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            SendError::Codec(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<vmx_codec::Error> for SendError {
+    fn from(e: vmx_codec::Error) -> Self {
+        SendError::Codec(e)
+    }
+}
 
 /// Describes the sending product to receivers (`<OMTInfo …/>`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -100,6 +192,15 @@ pub struct SenderConfig {
     pub discovery_server: Option<String>,
     /// Ports to try, in order.
     pub ports: RangeInclusive<u16>,
+    /// Announce with this [`Discovery`], shared with other senders and
+    /// directories, instead of starting one for this sender. When set,
+    /// `discovery_server` is not used: configure the shared one instead.
+    pub discovery: Option<Arc<Discovery>>,
+    /// Worker threads for the VMX encoder (1 = encode on the calling thread;
+    /// 0 is taken as 1). The bitstream does not depend on it. libvmx picks a
+    /// count from the frame size (`vmxcodec.cpp:280-312`) and libomtnet
+    /// doubles it above 60 fps (`codecs/OMTVMX1Codec.cs:107-113`).
+    pub encoder_threads: usize,
 }
 
 impl SenderConfig {
@@ -113,6 +214,8 @@ impl SenderConfig {
             announce: true,
             discovery_server: None,
             ports: DEFAULT_PORTS,
+            discovery: None,
+            encoder_threads: 1,
         }
     }
 }
@@ -132,13 +235,75 @@ pub struct VideoParams {
     pub premultiplied: bool,
 }
 
-/// Counters since the sender started.
+/// A frame compressed with VMX1 elsewhere, for [`Sender::send_encoded_video`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EncodedVideo<'a> {
+    /// The VMX1 bitstream, sent as is.
+    pub data: &'a [u8],
+    /// Width in pixels the frame was encoded at.
+    pub width: usize,
+    /// Height in pixels.
+    pub height: usize,
+    /// How it was coded: [`VideoFlags::INTERLACED`], [`VideoFlags::ALPHA`],
+    /// [`VideoFlags::HIGH_BIT_DEPTH`], [`VideoFlags::PREMULTIPLIED`].
+    /// [`VideoFlags::PREVIEW`] is set per connection and ignored here.
+    pub flags: VideoFlags,
+}
+
+/// Frame counters for one kind of frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FrameCounts {
+    /// Frames queued to a connection (one per connection).
+    pub queued: u64,
+    /// Frames written to a socket.
+    pub sent: u64,
+    /// Frames not queued: the connection's queue was full, or the frame was
+    /// over [`MAX_FRAME_LEN`].
+    pub dropped: u64,
+}
+
+/// Counters since the sender started. Frames are counted once per
+/// connection; frames still queued when a connection closes are neither
+/// sent nor dropped.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SenderStats {
-    /// Frames queued to a connection.
+    /// Frames queued to a connection, all kinds.
     pub frames_queued: u64,
     /// Frames dropped because a connection's queue was full or the frame was too large.
     pub frames_dropped: u64,
+    /// Bytes written to all connections, headers included.
+    pub bytes_sent: u64,
+    /// Video frames.
+    pub video: FrameCounts,
+    /// Audio frames.
+    pub audio: FrameCounts,
+    /// Metadata frames, protocol messages included.
+    pub metadata: FrameCounts,
+    /// Open connections now (a typical receiver uses two, T5).
+    pub connections: usize,
+}
+
+/// One open connection, for [`Sender::peer_stats`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PeerStats {
+    /// The receiver's address.
+    pub addr: SocketAddr,
+    /// Subscribed to video.
+    pub video: bool,
+    /// Subscribed to audio.
+    pub audio: bool,
+    /// Subscribed to metadata.
+    pub metadata: bool,
+    /// Asked for preview video.
+    pub preview: bool,
+    /// Bytes written to it.
+    pub bytes_sent: u64,
+    /// Frames written to it.
+    pub frames_sent: u64,
+    /// Frames dropped for it because its queue was full or the frame too large.
+    pub frames_dropped: u64,
+    /// Frames waiting in its queue now.
+    pub queued: usize,
 }
 
 /// An OMT source.
@@ -146,8 +311,9 @@ pub struct Sender {
     shared: Arc<Shared>,
     port: u16,
     full_name: Option<String>,
-    discovery: Option<Discovery>,
+    discovery: Option<Arc<Discovery>>,
     accept: Option<JoinHandle<()>>,
+    encoder_threads: usize,
     video: Mutex<VideoState>,
     metadata_rx: Mutex<mpsc::Receiver<(SocketAddr, Vec<u8>)>>,
 }
@@ -184,16 +350,18 @@ impl Sender {
             tally: Mutex::new(Tally::default()),
             metadata_tx,
             closing: AtomicBool::new(false),
-            queued: AtomicU64::new(0),
-            dropped: AtomicU64::new(0),
+            counts: Default::default(),
+            bytes_sent: AtomicU64::new(0),
         });
         // Announce before starting the accept thread, so a failure leaves nothing running.
         let (discovery, full_name) = if config.announce {
-            let d = match &config.discovery_server {
-                Some(url) => Discovery::with_server(url, false),
-                None => Discovery::new(),
-            }
-            .map_err(io::Error::other)?;
+            let d = match (&config.discovery, &config.discovery_server) {
+                (Some(d), _) => d.clone(),
+                (None, Some(url)) => {
+                    Arc::new(Discovery::with_server(url, false).map_err(io::Error::other)?)
+                }
+                (None, None) => Arc::new(Discovery::new().map_err(io::Error::other)?),
+            };
             let full = d.announce(&config.name, port).map_err(io::Error::other)?;
             (Some(d), Some(full))
         } else {
@@ -209,6 +377,7 @@ impl Sender {
             full_name,
             discovery,
             accept: Some(accept),
+            encoder_threads: config.encoder_threads.max(1),
             video: Mutex::new(VideoState {
                 encoder: None,
                 decoder: None,
@@ -306,24 +475,62 @@ impl Sender {
         *self.shared.tally.lock().unwrap()
     }
 
-    /// Frame counters.
+    /// Counters since the sender started.
     pub fn stats(&self) -> SenderStats {
+        let c = &self.shared.counts;
+        let kind = |k: Kind| FrameCounts {
+            queued: c[k as usize][QUEUED].load(Ordering::Relaxed),
+            sent: c[k as usize][SENT].load(Ordering::Relaxed),
+            dropped: c[k as usize][DROPPED].load(Ordering::Relaxed),
+        };
+        let (video, audio, metadata) = (kind(Kind::Video), kind(Kind::Audio), kind(Kind::Metadata));
         SenderStats {
-            frames_queued: self.shared.queued.load(Ordering::Relaxed),
-            frames_dropped: self.shared.dropped.load(Ordering::Relaxed),
+            frames_queued: video.queued + audio.queued + metadata.queued,
+            frames_dropped: video.dropped + audio.dropped + metadata.dropped,
+            bytes_sent: self.shared.bytes_sent.load(Ordering::Relaxed),
+            video,
+            audio,
+            metadata,
+            connections: self.connections(),
         }
+    }
+
+    /// Counters for each open connection.
+    pub fn peer_stats(&self) -> Vec<PeerStats> {
+        self.shared
+            .snapshot()
+            .iter()
+            .map(|p| {
+                let s = p.state.lock().unwrap();
+                PeerStats {
+                    addr: p.addr,
+                    video: s.video,
+                    audio: s.audio,
+                    metadata: s.metadata,
+                    preview: s.preview,
+                    bytes_sent: p.bytes_sent.load(Ordering::Relaxed),
+                    frames_sent: p.frames_sent.load(Ordering::Relaxed),
+                    frames_dropped: p.frames_dropped.load(Ordering::Relaxed),
+                    queued: p.outbox.len(),
+                }
+            })
+            .collect()
     }
 
     /// Encodes `frame` with VMX1 and sends it to every video subscriber.
     /// `metadata` is per-frame XML (include a trailing NUL if receivers expect
     /// one). Returns the number of connections it was queued for.
+    ///
+    /// Encoding holds only this sender's encoder: other senders, and this
+    /// sender's audio and metadata, are not held up by it.
     pub fn send_video(
         &self,
         frame: &vmx_codec::Frame,
         params: VideoParams,
         timestamp: i64,
         metadata: &[u8],
-    ) -> Result<usize, vmx_codec::Error> {
+    ) -> Result<usize, SendError> {
+        check_metadata(metadata)?;
         let peers = self.shared.snapshot();
         let video_peers: Vec<&Arc<Peer>> = peers
             .iter()
@@ -342,6 +549,7 @@ impl Sender {
                     let q = enc.quality();
                     let mut cfg = EncoderConfig::new(w, h);
                     cfg.profile = profile;
+                    cfg.threads = self.encoder_threads;
                     *enc = Encoder::new(cfg)?;
                     enc.set_quality(q);
                     *ep = profile;
@@ -350,6 +558,7 @@ impl Sender {
             slot => {
                 let mut cfg = EncoderConfig::new(w, h);
                 cfg.profile = profile;
+                cfg.threads = self.encoder_threads;
                 *slot = Some((w, h, profile, Encoder::new(cfg)?));
             }
         }
@@ -421,7 +630,86 @@ impl Sender {
                 (Some(pv), true) => pv.clone(),
                 _ => full.clone(),
             };
-            n += self.shared.queue(p, bytes, false) as usize;
+            n += self.shared.queue(p, bytes, Kind::Video) as usize;
+        }
+        Ok(n)
+    }
+
+    /// Sends a frame that is already VMX1-compressed, without decoding or
+    /// re-encoding it, to every video subscriber, as libomtnet does when
+    /// given a `VMX1` frame (V2, `OMTSend.cs:766-786`). Returns the number of
+    /// connections it was queued for.
+    ///
+    /// The bitstream is not checked, the sender's quality setting and
+    /// receivers' quality suggestions do not apply, and connections in
+    /// preview mode get the whole frame with [`VideoFlags::PREVIEW`] set,
+    /// because libomtnet sets the preview length of a forwarded frame to its
+    /// full length (P4, `OMTSend.cs:772`); the 1/8 preview decode reads only
+    /// the frame's DC prefix, so they can still show it.
+    pub fn send_encoded_video(
+        &self,
+        frame: EncodedVideo<'_>,
+        params: VideoParams,
+        timestamp: i64,
+        metadata: &[u8],
+    ) -> Result<usize, SendError> {
+        if frame.data.is_empty() {
+            return Err(SendError::EmptyVideo);
+        }
+        let dims = (i32::try_from(frame.width), i32::try_from(frame.height));
+        let (Ok(width @ 1..), Ok(height @ 1..)) = dims else {
+            return Err(SendError::InvalidDimensions {
+                width: frame.width,
+                height: frame.height,
+            });
+        };
+        check_metadata(metadata)?;
+        let mut flags = frame.flags.0 & !VideoFlags::PREVIEW;
+        if params.premultiplied && flags & VideoFlags::ALPHA != 0 {
+            flags |= VideoFlags::PREMULTIPLIED;
+        }
+        let header = VideoHeader {
+            codec: CODEC_VMX1,
+            width,
+            height,
+            frame_rate_n: params.frame_rate_n,
+            frame_rate_d: params.frame_rate_d,
+            aspect_ratio: params.aspect_ratio,
+            flags: VideoFlags(flags),
+            color_space: params.color_space,
+        };
+        let peers = self.shared.snapshot();
+        let (mut full, mut preview) = (None, None);
+        let mut n = 0;
+        for p in peers {
+            let wants = {
+                let s = p.state.lock().unwrap();
+                s.video.then_some(s.preview)
+            };
+            let Some(wants_preview) = wants else { continue };
+            let slot = if wants_preview {
+                &mut preview
+            } else {
+                &mut full
+            };
+            let bytes = slot
+                .get_or_insert_with(|| {
+                    let mut h = header;
+                    if wants_preview {
+                        h.flags = VideoFlags(flags | VideoFlags::PREVIEW);
+                    }
+                    let mut out = Vec::new();
+                    frame::write(
+                        timestamp,
+                        &ExtendedHeader::Video(h),
+                        frame.data,
+                        metadata,
+                        &mut out,
+                    );
+                    Arc::new(out)
+                })
+                .clone();
+            n += self.shared.queue(&p, bytes, Kind::Video) as usize;
         }
         Ok(n)
     }
@@ -430,9 +718,10 @@ impl Sender {
     /// `samples.len() / channels` samples each. Returns the number of
     /// connections it was queued for.
     ///
-    /// # Panics
-    ///
-    /// If `channels` is not 1..=32 or does not divide `samples.len()`.
+    /// Refused, as libomtnet refuses it (`OMTSend.cs:800-806`), when there
+    /// are no samples, `sample_rate` is not positive, `channels` is not
+    /// 1..=32 or the data exceeds [`MAX_AUDIO_DATA_LEN`]; also when
+    /// `channels` does not divide `samples.len()`.
     pub fn send_audio(
         &self,
         samples: &[f32],
@@ -440,17 +729,27 @@ impl Sender {
         sample_rate: i32,
         timestamp: i64,
         metadata: &[u8],
-    ) -> usize {
-        assert!((1..=32).contains(&channels), "1..=32 channels");
-        assert_eq!(
-            samples.len() % channels,
-            0,
-            "samples not a multiple of channels"
-        );
+    ) -> Result<usize, SendError> {
+        if !(1..=32).contains(&channels) {
+            return Err(SendError::InvalidChannels(channels));
+        }
+        if samples.is_empty() || sample_rate <= 0 {
+            return Err(SendError::EmptyAudio);
+        }
+        if samples.len() % channels != 0 {
+            return Err(SendError::SamplesNotMultipleOfChannels {
+                samples: samples.len(),
+                channels,
+            });
+        }
+        if samples.len() * 4 > MAX_AUDIO_DATA_LEN {
+            return Err(SendError::AudioTooLarge(samples.len() * 4));
+        }
+        check_metadata(metadata)?;
         let spc = samples.len() / channels;
         let mut active = 0u32;
         let mut data = Vec::with_capacity(samples.len() * 4);
-        for (ch, plane) in samples.chunks_exact(spc.max(1)).enumerate() {
+        for (ch, plane) in samples.chunks_exact(spc).enumerate() {
             // A2: a channel is left out when every byte is zero, so -0.0 counts as sound.
             if plane.iter().any(|s| s.to_bits() != 0) {
                 active |= 1 << ch;
@@ -479,10 +778,10 @@ impl Sender {
         let mut n = 0;
         for p in self.shared.snapshot() {
             if p.state.lock().unwrap().audio {
-                n += self.shared.queue(&p, out.clone(), false) as usize;
+                n += self.shared.queue(&p, out.clone(), Kind::Audio) as usize;
             }
         }
-        n
+        Ok(n)
     }
 
     /// Sends application metadata to every connection that subscribed to
@@ -508,20 +807,50 @@ impl Drop for Sender {
             let _ = d.withdraw(full);
         }
         self.shared.closing.store(true, Ordering::SeqCst);
+        // Sockets first: a writer blocked on a stalled receiver fails at once.
+        for p in self.shared.snapshot() {
+            p.close();
+        }
         // Wake the blocking accept.
         let _ = TcpStream::connect_timeout(
             &SocketAddr::from(([127, 0, 0, 1], self.port)),
             Duration::from_millis(200),
         );
+        let deadline = Instant::now() + DROP_TIMEOUT;
         if let Some(h) = self.accept.take() {
-            let _ = h.join();
+            join_bounded(h, deadline);
         }
         let peers: Vec<Arc<Peer>> = std::mem::take(&mut *self.shared.peers.lock().unwrap());
-        for p in peers {
+        for p in &peers {
             p.close();
-            p.join();
+        }
+        for p in peers {
+            p.join(deadline);
         }
     }
+}
+
+/// Joins `h` if it finishes by `deadline`; otherwise leaves it running
+/// detached. Returns whether it was joined.
+pub(crate) fn join_bounded(h: JoinHandle<()>, deadline: Instant) -> bool {
+    if h.thread().id() == std::thread::current().id() {
+        return false;
+    }
+    while !h.is_finished() {
+        if Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let _ = h.join();
+    true
+}
+
+fn check_metadata(metadata: &[u8]) -> Result<(), SendError> {
+    if metadata.len() > u16::MAX as usize {
+        return Err(SendError::MetadataTooLarge(metadata.len()));
+    }
+    Ok(())
 }
 
 /// Redirect state, as in libomtnet's `OMTRedirect` for a sender.
@@ -583,8 +912,21 @@ struct Shared {
     tally: Mutex<Tally>,
     metadata_tx: mpsc::SyncSender<(SocketAddr, Vec<u8>)>,
     closing: AtomicBool,
-    queued: AtomicU64,
-    dropped: AtomicU64,
+    /// Queued, sent and dropped frames, by [`Kind`].
+    counts: [[AtomicU64; 3]; 3],
+    bytes_sent: AtomicU64,
+}
+
+const QUEUED: usize = 0;
+const SENT: usize = 1;
+const DROPPED: usize = 2;
+
+/// What a queued frame is, for the queue limits and the counters.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    Video = 0,
+    Audio = 1,
+    Metadata = 2,
 }
 
 impl Shared {
@@ -592,18 +934,28 @@ impl Shared {
         self.peers.lock().unwrap().clone()
     }
 
-    fn queue(&self, peer: &Peer, bytes: Arc<Vec<u8>>, metadata: bool) -> bool {
-        let ok = bytes.len() <= MAX_FRAME_LEN && peer.outbox.push(bytes, metadata);
-        let counter = if ok { &self.queued } else { &self.dropped };
-        counter.fetch_add(1, Ordering::Relaxed);
+    fn queue(&self, peer: &Peer, bytes: Arc<Vec<u8>>, kind: Kind) -> bool {
+        let ok = bytes.len() <= MAX_FRAME_LEN && peer.outbox.push(bytes, kind);
+        let which = if ok { QUEUED } else { DROPPED };
+        self.counts[kind as usize][which].fetch_add(1, Ordering::Relaxed);
+        if !ok {
+            peer.frames_dropped.fetch_add(1, Ordering::Relaxed);
+        }
         ok
+    }
+
+    fn sent(&self, peer: &Peer, len: usize, kind: Kind) {
+        self.counts[kind as usize][SENT].fetch_add(1, Ordering::Relaxed);
+        self.bytes_sent.fetch_add(len as u64, Ordering::Relaxed);
+        peer.frames_sent.fetch_add(1, Ordering::Relaxed);
+        peer.bytes_sent.fetch_add(len as u64, Ordering::Relaxed);
     }
 
     fn broadcast_metadata(&self, bytes: Arc<Vec<u8>>) -> usize {
         let mut n = 0;
         for p in self.snapshot() {
             if p.state.lock().unwrap().metadata {
-                n += self.queue(&p, bytes.clone(), true) as usize;
+                n += self.queue(&p, bytes.clone(), Kind::Metadata) as usize;
             }
         }
         n
@@ -658,6 +1010,9 @@ struct Peer {
     state: Mutex<PeerState>,
     outbox: Outbox,
     threads: Mutex<Vec<JoinHandle<()>>>,
+    bytes_sent: AtomicU64,
+    frames_sent: AtomicU64,
+    frames_dropped: AtomicU64,
 }
 
 impl Peer {
@@ -666,12 +1021,10 @@ impl Peer {
         let _ = self.stream.shutdown(Shutdown::Both);
     }
 
-    fn join(&self) {
+    fn join(&self, deadline: Instant) {
         let handles = std::mem::take(&mut *self.threads.lock().unwrap());
         for h in handles {
-            if h.thread().id() != std::thread::current().id() {
-                let _ = h.join();
-            }
+            join_bounded(h, deadline);
         }
     }
 }
@@ -684,7 +1037,7 @@ struct Outbox {
 
 #[derive(Default)]
 struct OutQueue {
-    items: VecDeque<(Arc<Vec<u8>>, bool)>,
+    items: VecDeque<(Arc<Vec<u8>>, Kind)>,
     av: usize,
     metadata: usize,
     closed: bool,
@@ -698,12 +1051,12 @@ impl Outbox {
         }
     }
 
-    fn push(&self, bytes: Arc<Vec<u8>>, metadata: bool) -> bool {
+    fn push(&self, bytes: Arc<Vec<u8>>, kind: Kind) -> bool {
         let mut q = self.q.lock().unwrap();
         if q.closed {
             return false;
         }
-        let (count, max) = if metadata {
+        let (count, max) = if kind == Kind::Metadata {
             (&mut q.metadata, MAX_QUEUED_METADATA)
         } else {
             (&mut q.av, MAX_QUEUED_AV)
@@ -712,13 +1065,13 @@ impl Outbox {
             return false;
         }
         *count += 1;
-        q.items.push_back((bytes, metadata));
+        q.items.push_back((bytes, kind));
         self.ready.notify_one();
         true
     }
 
     /// Blocks until there is something to write; `None` once closed.
-    fn pop(&self) -> Option<(Arc<Vec<u8>>, bool)> {
+    fn pop(&self) -> Option<(Arc<Vec<u8>>, Kind)> {
         let mut q = self.q.lock().unwrap();
         loop {
             if q.closed {
@@ -732,9 +1085,9 @@ impl Outbox {
     }
 
     /// Marks an item as written, freeing its slot.
-    fn done(&self, metadata: bool) {
+    fn done(&self, kind: Kind) {
         let mut q = self.q.lock().unwrap();
-        if metadata {
+        if kind == Kind::Metadata {
             q.metadata -= 1;
         } else {
             q.av -= 1;
@@ -744,6 +1097,11 @@ impl Outbox {
     fn close(&self) {
         self.q.lock().unwrap().closed = true;
         self.ready.notify_all();
+    }
+
+    /// Items waiting to be written.
+    fn len(&self) -> usize {
+        self.q.lock().unwrap().items.len()
     }
 }
 
@@ -813,6 +1171,9 @@ fn start_peer(stream: TcpStream, id: u64, shared: &Arc<Shared>) -> io::Result<()
         state: Mutex::new(PeerState::default()),
         outbox: Outbox::new(),
         threads: Mutex::new(Vec::new()),
+        bytes_sent: AtomicU64::new(0),
+        frames_sent: AtomicU64::new(0),
+        frames_dropped: AtomicU64::new(0),
     });
 
     // §4.2: sender info, connection metadata, then the combined tally, sent
@@ -820,12 +1181,12 @@ fn start_peer(stream: TcpStream, id: u64, shared: &Arc<Shared>) -> io::Result<()
     for xml in &shared.on_connect {
         let mut out = Vec::new();
         frame::write_metadata(0, xml, &mut out);
-        shared.queue(&peer, Arc::new(out), true);
+        shared.queue(&peer, Arc::new(out), Kind::Metadata);
     }
     let mut out = Vec::new();
     let tally = *shared.tally.lock().unwrap();
     frame::write_metadata(0, Command::Tally(tally).as_bytes(), &mut out);
-    shared.queue(&peer, Arc::new(out), true);
+    shared.queue(&peer, Arc::new(out), Kind::Metadata);
     // Then the redirect, if active (`OMTSend.cs:372-375`, X1).
     let redirect = {
         let r = shared.redirect.lock().unwrap();
@@ -834,7 +1195,7 @@ fn start_peer(stream: TcpStream, id: u64, shared: &Arc<Shared>) -> io::Result<()
     if let Some(xml) = redirect {
         let mut out = Vec::new();
         frame::write_metadata(0, xml.as_bytes(), &mut out);
-        shared.queue(&peer, Arc::new(out), true);
+        shared.queue(&peer, Arc::new(out), Kind::Metadata);
     }
 
     let writer_peer = peer.clone();
@@ -855,12 +1216,13 @@ fn start_peer(stream: TcpStream, id: u64, shared: &Arc<Shared>) -> io::Result<()
 }
 
 fn write_loop(mut stream: TcpStream, peer: Arc<Peer>, shared: Arc<Shared>) {
-    while let Some((bytes, metadata)) = peer.outbox.pop() {
+    while let Some((bytes, kind)) = peer.outbox.pop() {
         let result = stream.write_all(&bytes);
-        peer.outbox.done(metadata);
+        peer.outbox.done(kind);
         if result.is_err() {
             break;
         }
+        shared.sent(&peer, bytes.len(), kind);
     }
     peer.close();
     shared.remove(peer.id);
@@ -954,7 +1316,7 @@ fn escape_attr(s: &str) -> String {
 mod tests {
     use super::*;
     use crate::receiver::{Event, Receiver, ReceiverConfig};
-    use std::time::Instant;
+    use crate::OwnedFrame;
     use vmx_codec::{Frame, PixelFormat};
 
     fn quiet(name: &str) -> SenderConfig {
@@ -1022,7 +1384,7 @@ mod tests {
         });
         let mut audio = vec![0.0f32; 2 * 100];
         audio[..100].fill(0.5);
-        assert_eq!(tx.send_audio(&audio, 2, 48000, 7, b""), 1);
+        assert_eq!(tx.send_audio(&audio, 2, 48000, 7, b""), Ok(1));
 
         let (mut info, mut video, mut audio_hdr) = (false, None, None);
         let deadline = Instant::now() + Duration::from_secs(3);
@@ -1148,12 +1510,338 @@ mod tests {
     fn outbox_limits() {
         let o = Outbox::new();
         for _ in 0..MAX_QUEUED_AV {
-            assert!(o.push(Arc::new(vec![]), false));
+            assert!(o.push(Arc::new(vec![]), Kind::Video));
         }
-        assert!(!o.push(Arc::new(vec![]), false));
-        assert!(o.push(Arc::new(vec![]), true));
+        assert!(!o.push(Arc::new(vec![]), Kind::Audio));
+        assert!(o.push(Arc::new(vec![]), Kind::Metadata));
+        assert_eq!(o.len(), MAX_QUEUED_AV + 1);
         let (_, m) = o.pop().unwrap();
         o.done(m);
-        assert!(o.push(Arc::new(vec![]), false));
+        assert!(o.push(Arc::new(vec![]), Kind::Video));
+    }
+
+    fn pattern(w: usize, h: usize) -> Frame {
+        let mut frame = Frame::new(w, h, PixelFormat::Uyvy);
+        for (i, b) in frame.planes[0].data.iter_mut().enumerate() {
+            *b = (i * 7 % 251) as u8;
+        }
+        frame
+    }
+
+    const PARAMS: VideoParams = VideoParams {
+        frame_rate_n: 30,
+        frame_rate_d: 1,
+        aspect_ratio: 2.0,
+        color_space: 709,
+        premultiplied: false,
+    };
+
+    /// The first video frame `rx` delivers.
+    fn next_video(rx: &Receiver) -> (VideoHeader, OwnedFrame) {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            if let Some(Event::Frame(_, f)) = rx.recv_timeout(Duration::from_millis(100)) {
+                if let ExtendedHeader::Video(v) = f.ext {
+                    return (v, f);
+                }
+            }
+        }
+        panic!("no video frame");
+    }
+
+    #[test]
+    fn encoded_frames_are_forwarded_untouched() {
+        // V2, P4: a VMX1 frame goes out as given; a preview connection gets
+        // the whole of it with flag 8 (`OMTSend.cs:766-786,772`).
+        let tx = Sender::new(quiet("encoded")).unwrap();
+        let addr = SocketAddr::from(([127, 0, 0, 1], tx.port()));
+        let full_cfg = ReceiverConfig {
+            audio: false,
+            ..ReceiverConfig::default()
+        };
+        let preview_cfg = ReceiverConfig {
+            preview: true,
+            ..full_cfg
+        };
+        let full_rx = Receiver::connect(addr, full_cfg).unwrap();
+        let preview_rx = Receiver::connect(addr, preview_cfg).unwrap();
+        wait_for(|| tx.video_receivers() == 2);
+
+        let frame = pattern(64, 32);
+        let mut cfg = EncoderConfig::new(64, 32);
+        cfg.profile = Profile::OmtLq; // not what the sender would pick (V3)
+        let bits = Encoder::new(cfg).unwrap().encode(&frame).unwrap();
+        let encoded = EncodedVideo {
+            data: &bits,
+            width: 64,
+            height: 32,
+            flags: VideoFlags(VideoFlags::INTERLACED | VideoFlags::PREVIEW),
+        };
+        let params = VideoParams {
+            premultiplied: true, // no alpha: ignored
+            ..PARAMS
+        };
+        assert_eq!(tx.send_encoded_video(encoded, params, 42, b"<m/>\0"), Ok(2));
+
+        let (v, f) = next_video(&full_rx);
+        assert_eq!(f.data, bits, "bitstream untouched");
+        assert_eq!(f.metadata, b"<m/>\0");
+        assert_eq!(f.header.timestamp, 42);
+        assert_eq!(
+            (v.codec, v.width, v.height, v.frame_rate_n, v.color_space),
+            (CODEC_VMX1, 64, 32, 30, 709)
+        );
+        assert_eq!(v.flags, VideoFlags(VideoFlags::INTERLACED));
+        let (pv, pf) = next_video(&preview_rx);
+        assert_eq!(
+            pf.data, bits,
+            "preview connections get the whole frame (P4)"
+        );
+        assert_eq!(
+            pv.flags,
+            VideoFlags(VideoFlags::INTERLACED | VideoFlags::PREVIEW)
+        );
+        assert!(Decoder::new(64, 32)
+            .unwrap()
+            .decode_preview(&pf.data, false)
+            .is_ok());
+        assert_eq!(tx.stats().video.queued, 2);
+    }
+
+    #[test]
+    fn bad_input_is_an_error_not_a_panic() {
+        let tx = Sender::new(quiet("errors")).unwrap();
+        let one = [0.5f32; 4];
+        assert_eq!(
+            tx.send_audio(&one, 0, 48000, 0, b""),
+            Err(SendError::InvalidChannels(0))
+        );
+        assert_eq!(
+            tx.send_audio(&one, 33, 48000, 0, b""),
+            Err(SendError::InvalidChannels(33))
+        );
+        assert_eq!(
+            tx.send_audio(&one, 3, 48000, 0, b""),
+            Err(SendError::SamplesNotMultipleOfChannels {
+                samples: 4,
+                channels: 3
+            })
+        );
+        assert_eq!(
+            tx.send_audio(&[], 2, 48000, 0, b""),
+            Err(SendError::EmptyAudio)
+        );
+        assert_eq!(
+            tx.send_audio(&one, 2, 0, 0, b""),
+            Err(SendError::EmptyAudio)
+        );
+        let big = vec![0.0f32; MAX_AUDIO_DATA_LEN / 4 + 2];
+        assert_eq!(
+            tx.send_audio(&big, 2, 48000, 0, b""),
+            Err(SendError::AudioTooLarge(big.len() * 4))
+        );
+        let meta = vec![b'x'; 65536];
+        assert_eq!(
+            tx.send_audio(&one, 2, 48000, 0, &meta),
+            Err(SendError::MetadataTooLarge(65536))
+        );
+        assert_eq!(tx.send_audio(&one, 2, 48000, 0, b""), Ok(0));
+        assert_eq!(
+            tx.send_video(&pattern(64, 32), PARAMS, 0, &meta),
+            Err(SendError::MetadataTooLarge(65536))
+        );
+        assert!(matches!(
+            tx.send_video(&Frame::new(8, 8, PixelFormat::Uyvy), PARAMS, 0, b""),
+            Err(SendError::Codec(_))
+        ));
+        let encoded = |data, width, height| EncodedVideo {
+            data,
+            width,
+            height,
+            flags: VideoFlags::default(),
+        };
+        assert_eq!(
+            tx.send_encoded_video(encoded(&[], 64, 32), PARAMS, 0, b""),
+            Err(SendError::EmptyVideo)
+        );
+        assert_eq!(
+            tx.send_encoded_video(encoded(&[1], 0, 32), PARAMS, 0, b""),
+            Err(SendError::InvalidDimensions {
+                width: 0,
+                height: 32
+            })
+        );
+        assert_eq!(
+            tx.send_encoded_video(encoded(&[1], 64, 1 << 40), PARAMS, 0, b""),
+            Err(SendError::InvalidDimensions {
+                width: 64,
+                height: 1 << 40
+            })
+        );
+        assert!(SendError::EmptyAudio.to_string().contains("audio"));
+    }
+
+    #[test]
+    fn encoder_threads_do_not_change_the_bitstream() {
+        let tx = Sender::new(SenderConfig {
+            encoder_threads: 4,
+            ..quiet("threads")
+        })
+        .unwrap();
+        let addr = SocketAddr::from(([127, 0, 0, 1], tx.port()));
+        let cfg = ReceiverConfig {
+            audio: false,
+            ..ReceiverConfig::default()
+        };
+        let rx = Receiver::connect(addr, cfg).unwrap();
+        wait_for(|| tx.video_receivers() == 1);
+        let frame = pattern(256, 128);
+        assert_eq!(tx.send_video(&frame, PARAMS, 0, b""), Ok(1));
+        let mut cfg = EncoderConfig::new(256, 128);
+        cfg.profile = Profile::OmtSq;
+        let expected = Encoder::new(cfg).unwrap().encode(&frame).unwrap();
+        assert_eq!(next_video(&rx).1.data, expected);
+    }
+
+    #[test]
+    fn stats_count_frames_bytes_and_connections() {
+        let tx = Sender::new(quiet("stats")).unwrap();
+        let addr = SocketAddr::from(([127, 0, 0, 1], tx.port()));
+        let rx = Receiver::connect(addr, ReceiverConfig::default()).unwrap();
+        wait_for(|| tx.connections() == 2 && tx.video_receivers() == 1);
+        wait_for(|| tx.send_audio(&[0.25; 200], 2, 48000, 0, b"") == Ok(1));
+        assert_eq!(tx.send_video(&pattern(64, 32), PARAMS, 0, b""), Ok(1));
+        next_video(&rx);
+        wait_for(|| {
+            let s = tx.stats();
+            s.video.sent == 1 && s.audio.sent == 1
+        });
+        let s = tx.stats();
+        assert_eq!(s.connections, 2);
+        assert_eq!((s.video.queued, s.video.dropped), (1, 0));
+        // Sender info and a tally on each connection, at least.
+        assert!(s.metadata.sent >= 4, "{s:?}");
+        assert_eq!(
+            s.frames_queued,
+            s.video.queued + s.audio.queued + s.metadata.queued
+        );
+        let peers = tx.peer_stats();
+        assert_eq!(peers.len(), 2);
+        assert_eq!(
+            peers.iter().map(|p| p.bytes_sent).sum::<u64>(),
+            s.bytes_sent
+        );
+        assert_eq!(peers.iter().filter(|p| p.video).count(), 1);
+        assert_eq!(peers.iter().filter(|p| p.audio).count(), 1);
+        let video_peer = peers.iter().find(|p| p.video).unwrap();
+        assert!(video_peer.metadata && !video_peer.preview);
+
+        // The receiver's side of the same traffic.
+        wait_for(|| {
+            let r = rx.stats();
+            r.video.bytes + r.audio.bytes == s.bytes_sent
+        });
+        let r = rx.stats();
+        assert!(r.video.frames >= 3 && r.audio.frames >= 3, "{r:?}");
+        assert_eq!((r.reconnects, r.redirects), (0, 0));
+    }
+
+    #[test]
+    fn drop_is_bounded_with_a_stalled_receiver() {
+        // A receiver that subscribes and never reads: the writer ends up
+        // blocked in `write_all`, and the queue overflows.
+        let tx = Sender::new(quiet("stalled")).unwrap();
+        let mut stalled = TcpStream::connect(("127.0.0.1", tx.port())).unwrap();
+        let mut out = Vec::new();
+        for c in [Command::SubscribeMetadata, Command::SubscribeVideo] {
+            frame::write_metadata(0, c.as_bytes(), &mut out);
+        }
+        stalled.write_all(&out).unwrap();
+        wait_for(|| tx.video_receivers() == 1);
+        let mut frame = Frame::new(1280, 720, PixelFormat::Uyvy);
+        for (i, b) in frame.planes[0].data.iter_mut().enumerate() {
+            *b = (i.wrapping_mul(2_654_435_761) >> 13) as u8; // noise: large frames
+        }
+        wait_for(|| {
+            let _ = tx.send_video(&frame, PARAMS, 0, b"");
+            tx.peer_stats()[0].frames_dropped > 0
+        });
+        let peer = &tx.peer_stats()[0];
+        // A full queue, less the frame being written.
+        assert!(peer.queued >= MAX_QUEUED_AV - 1, "{peer:?}");
+        assert!(tx.stats().video.dropped > 0);
+
+        let start = Instant::now();
+        drop(tx);
+        assert!(
+            start.elapsed() < DROP_TIMEOUT + Duration::from_secs(1),
+            "drop took {:?}",
+            start.elapsed()
+        );
+        drop(stalled);
+    }
+
+    /// Needs working multicast; run with `--ignored` and watch with
+    /// `dns-sd -B _omt._tcp`: both names come from one responder.
+    #[test]
+    #[ignore = "uses the network's mDNS"]
+    fn senders_share_one_mdns_responder() {
+        let shared = Arc::new(Discovery::new().unwrap());
+        let config = |name: &str| SenderConfig {
+            announce: true,
+            discovery: Some(shared.clone()),
+            ..quiet(name)
+        };
+        let a = Sender::new(config("m12-prereqs-mdns-a")).unwrap();
+        let b = Sender::new(config("m12-prereqs-mdns-b")).unwrap();
+        let browser = shared.browse().unwrap();
+        let mut seen = std::collections::HashSet::new();
+        let deadline = Instant::now() + Duration::from_secs(8);
+        while seen.len() < 2 && Instant::now() < deadline {
+            if let Some(crate::discovery::SourceEvent::Resolved(s)) =
+                browser.recv_timeout(Duration::from_millis(200))
+            {
+                if [a.full_name(), b.full_name()].contains(&Some(s.full_name.as_str())) {
+                    seen.insert(s.full_name);
+                }
+            }
+        }
+        assert_eq!(seen.len(), 2, "{seen:?}");
+        std::thread::sleep(Duration::from_secs(3));
+        drop(a);
+        std::thread::sleep(Duration::from_secs(3));
+    }
+
+    #[test]
+    fn senders_share_one_discovery() {
+        use crate::address::Directory;
+        use crate::discovery_server::Server;
+        let server = Server::bind(0).unwrap();
+        let url = format!("omt://127.0.0.1:{}", server.port());
+        let shared = Arc::new(Discovery::with_server(&url, false).unwrap());
+        let config = |name: &str| SenderConfig {
+            announce: true,
+            discovery: Some(shared.clone()),
+            discovery_server: Some("omt://unused.invalid".into()), // the shared one wins
+            ..quiet(name)
+        };
+        let a = Sender::new(config("m12-prereqs-share-a")).unwrap();
+        let b = Sender::new(config("m12-prereqs-share-b")).unwrap();
+        let dir = Directory::with_shared(shared.clone()).unwrap();
+        let (fa, fb) = (a.full_name().unwrap(), b.full_name().unwrap());
+        assert_eq!(
+            dir.wait_for(fa, Duration::from_secs(3)).unwrap().port,
+            a.port()
+        );
+        assert_eq!(
+            dir.wait_for(fb, Duration::from_secs(3)).unwrap().port,
+            b.port()
+        );
+        assert_eq!(server.connections(), 1, "one client for all of them");
+        let fa = fa.to_owned();
+        drop(a);
+        wait_for(|| dir.get(&fa).is_none());
+        assert!(dir.get(b.full_name().unwrap()).is_some());
+        assert_eq!(server.entries().len(), 1);
     }
 }
