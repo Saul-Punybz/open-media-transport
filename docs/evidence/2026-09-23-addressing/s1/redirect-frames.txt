@@ -1,0 +1,5 @@
+  1.99 6400->52097 ts=0 len=67 b'<OMTRedirect NewAddress="SAULS-MACBOOK-PRO.LOCAL (addressing-B)" />'
+  2.00 6400->52099 ts=0 len=67 b'<OMTRedirect NewAddress="SAULS-MACBOOK-PRO.LOCAL (addressing-B)" />'
+  9.99 6400->52099 ts=0 len=29 b'<OMTRedirect NewAddress="" />'
+  9.99 6400->52103 ts=0 len=29 b'<OMTRedirect NewAddress="" />'
+ 10.00 6400->52104 ts=0 len=29 b'<OMTRedirect NewAddress="" />'

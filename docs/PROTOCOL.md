@@ -171,7 +171,7 @@ precedes `/>`.
 | Sender info | `<OMTInfo ProductName="…" Manufacturer="…" Version="…" />` | on connect, if set; and broadcast when set | `OMTPublicTypes.cs:238-250`, `OMTSend.cs:366-369,167-177` |  2026-09-21 [L] |
 | Connection metadata | application-defined strings | on connect | `OMTSend.cs:370,192-204` |  2026-09-21 [L] |
 | Tally | the same four strings as §4.1 | on connect (combined tally), then on every change | `OMTSend.cs:371,464-467` |  2026-09-21 [L] |
-| Redirect | `<OMTRedirect NewAddress="…" />` | on connect if a redirect is active, and when it changes | `OMTRedirect.cs:59-63,50-57,181-194` | |
+| Redirect | `<OMTRedirect NewAddress="…" />` | on connect if a redirect is active, and when it changes | `OMTRedirect.cs:59-63,50-57,181-194` | 2026-09-23 [A] (§9) |
 
 - The combined tally is the OR of every connection's preview and program bits:
   `OMTSend.cs:583-597`.
@@ -302,8 +302,8 @@ Consequences, all **inference**:
 
 | # | Statement | Source | Live |
 |---|---|---|---|
-| N1 | A receiver is given either a full name `MACHINE (Name)` or a URL `omt://host:port`. | `OMTReceive.cs:142`, `OMTDiscovery.cs:389-400` | |
-| N2 | Full names are matched by exact string comparison against discovered entries. | `OMTDiscovery.cs:401-415` | |
+| N1 | A receiver is given either a full name `MACHINE (Name)` or a URL `omt://host:port`. | `OMTReceive.cs:142`, `OMTDiscovery.cs:389-400` | 2026-09-23 [A] (full names only) |
+| N2 | Full names are matched by exact string comparison against discovered entries. Every connection attempt looks the name up again, so a sender that comes back on another port is found (the table entry's port is updated or the entry replaced, `OMTDiscovery.cs:175-247`). | `OMTDiscovery.cs:401-415`, `OMTReceive.cs:328-349` | 2026-09-23 [A] (our receiver, port change) |
 | N3 | A URL is parsed with .NET `Uri` and the host resolved with DNS; no discovery is involved. | `OMTDiscovery.cs:362-387` | |
 | N4 | A sender's own URL is `omt://MACHINE:port`. | `OMTAddress.cs:60-63` | |
 | N5 | Connection attempts are rate-limited to one per second and retried whenever the application calls `Receive` and the receiver is not connected. There is no other reconnect timer. | `OMTReceive.cs:328-331,662-673,675-680` | |
@@ -314,12 +314,23 @@ A sender can tell its receivers to use another source instead ("virtual source")
 
 | # | Statement | Source | Live |
 |---|---|---|---|
-| X1 | The sender sends `<OMTRedirect NewAddress="…" />` to every metadata-subscribed connection, and to each new connection. An empty address cancels the redirect. | `OMTSend.cs:230-234`, `OMTRedirect.cs:50-63,110-127` | |
-| X2 | A receiver that gets a redirect reconnects to the new address, and keeps a metadata-only side connection to the original address to hear further changes. | `OMTReceive.cs:562-603`, `OMTRedirect.cs:84-108` | |
+| X1 | The sender sends `<OMTRedirect NewAddress="…" />` to every metadata-subscribed connection, and to each new connection. An empty address cancels the redirect. Bytes as captured: one line, one space before `/>`, no NUL, timestamp 0; the cancel is `<OMTRedirect NewAddress="" />`. Once `SetRedirect` has been called, even a cleared redirect is sent (empty) to every new connection. | `OMTSend.cs:230-234,372-375`, `OMTRedirect.cs:50-63,110-127` | 2026-09-23 [A] |
+| X2 | A receiver that gets a redirect reconnects to the new address, and keeps a metadata-only side connection to the original address to hear further changes. | `OMTReceive.cs:562-603`, `OMTRedirect.cs:84-108` | 2026-09-23 [A] |
 | X3 | A sender redirected to another sender that is itself redirected forwards the upstream address ("redirect chain"). | `OMTRedirect.cs:40-49,128-163` | |
 | X4 | Redirecting to one's own address is treated as no redirect. | `OMTRedirect.cs:115-118` | |
 
-Not in `PROTOCOL.md`. Implement after basic send and receive.
+Not in `PROTOCOL.md`. Implemented in `redirect.rs`, `receiver.rs` and `Sender::set_redirect`.
+
+**[A]** — [`evidence/2026-09-23-addressing`](evidence/2026-09-23-addressing/README.md):
+libomtnet and our code redirecting each other on one Mac, captured with `tshark`.
+
+**Upstream bug, confirmed [A].** A libomtnet receiver whose first redirect message is the
+empty one (it connected after the sender cleared a redirect, X1) treats it as a first
+redirect: it reconnects to the same sender, creates its redirect state without a side
+connection (`OMTReceive.cs:579-590`, `OMTRedirect.cs:84-90`), and from then on logs
+"Skipping redirect … due to existing side channel" for every redirect it is sent
+(`OMTReceive.cs:591-594`). Our sender sends a redirect to new connections only while one
+is active; our receiver ignores an empty redirect it is not following.
 
 ## 10. Discovery server (optional)
 

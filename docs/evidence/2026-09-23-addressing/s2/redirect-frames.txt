@@ -1,0 +1,7 @@
+  2.70 6401->52137 ts=0 len=67 b'<OMTRedirect NewAddress="SAULS-MACBOOK-PRO.LOCAL (addressing-D)" />'
+  2.70 6401->52139 ts=0 len=67 b'<OMTRedirect NewAddress="SAULS-MACBOOK-PRO.LOCAL (addressing-D)" />'
+  8.86 6401->52139 ts=0 len=29 b'<OMTRedirect NewAddress="" />'
+ 15.70 6401->52139 ts=0 len=67 b'<OMTRedirect NewAddress="SAULS-MACBOOK-PRO.LOCAL (addressing-D)" />'
+ 15.70 6401->52145 ts=0 len=67 b'<OMTRedirect NewAddress="SAULS-MACBOOK-PRO.LOCAL (addressing-D)" />'
+ 15.70 6401->52143 ts=0 len=67 b'<OMTRedirect NewAddress="SAULS-MACBOOK-PRO.LOCAL (addressing-D)" />'
+ 15.70 6401->52149 ts=0 len=67 b'<OMTRedirect NewAddress="SAULS-MACBOOK-PRO.LOCAL (addressing-D)" />'

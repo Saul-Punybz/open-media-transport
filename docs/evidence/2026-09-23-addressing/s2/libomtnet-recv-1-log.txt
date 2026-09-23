@@ -1,0 +1,13 @@
+log: 9/23/2026 9:48:49 AM,[OMTReceive.Connect],Connected.Video: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:48:49 AM,[OMTReceive.Connect],Connected.Audio: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:48:51 AM,[OMTRedirect],Redirecting SAULS-MACBOOK-PRO.LOCAL (addressing-C) to SAULS-MACBOOK-PRO.LOCAL (addressing-D) and monitoring for updates from SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:48:51 AM,[OMTReceive],First redirect of SAULS-MACBOOK-PRO.LOCAL (addressing-C) to SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:48:51 AM,[OMTReceive.Connect],Connected.Metadata: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:48:51 AM,[OMTReceive.Connect],Connected.Video: SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:48:51 AM,[OMTReceive.Connect],Connected.Audio: SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:48:57 AM,[OMTReceive],Redirecting SAULS-MACBOOK-PRO.LOCAL (addressing-C) to
+log: 9/23/2026 9:48:57 AM,[OMTReceive.Connect],Connected.Video: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:48:57 AM,[OMTReceive.Connect],Connected.Audio: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:49:04 AM,[OMTReceive],Redirecting SAULS-MACBOOK-PRO.LOCAL (addressing-C) to SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:49:04 AM,[OMTReceive.Connect],Connected.Video: SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:49:04 AM,[OMTReceive.Connect],Connected.Audio: SAULS-MACBOOK-PRO.LOCAL (addressing-D)

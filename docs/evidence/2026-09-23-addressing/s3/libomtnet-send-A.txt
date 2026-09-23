@@ -1,0 +1,9 @@
+send address=SAULS-MACBOOK-PRO.LOCAL (addressing-C) url=omt://SAULS-MACBOOK-PRO.LOCAL:6401 port=6401
+send tally preview=0 program=1
+send redirect t=5.0 address="SAULS-MACBOOK-PRO.LOCAL (addressing-D)"
+send tally preview=0 program=0
+send redirect t=11.0 address=""
+send tally preview=0 program=1
+send redirect t=18.0 address="SAULS-MACBOOK-PRO.LOCAL (addressing-D)"
+send tally preview=0 program=0
+send done connections=0

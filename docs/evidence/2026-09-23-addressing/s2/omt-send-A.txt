@@ -1,0 +1,12 @@
+send name="SAULS-MACBOOK-PRO.LOCAL (addressing-C)" port=6401
+send tally preview=false program=true
+send redirect t=5.0 set="SAULS-MACBOOK-PRO.LOCAL (addressing-D)" effective=Some("SAULS-MACBOOK-PRO.LOCAL (addressing-D)")
+send redirect now=Some("SAULS-MACBOOK-PRO.LOCAL (addressing-D)")
+send tally preview=false program=false
+send redirect t=11.2 set="" effective=None
+send redirect now=None
+send tally preview=false program=true
+send redirect t=18.0 set="SAULS-MACBOOK-PRO.LOCAL (addressing-D)" effective=Some("SAULS-MACBOOK-PRO.LOCAL (addressing-D)")
+send redirect now=Some("SAULS-MACBOOK-PRO.LOCAL (addressing-D)")
+send tally preview=false program=false
+send done connections=0 queued=832 dropped=0

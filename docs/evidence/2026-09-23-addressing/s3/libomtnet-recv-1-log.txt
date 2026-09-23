@@ -1,0 +1,16 @@
+log: 9/23/2026 9:49:19 AM,[OMTReceive.Connect],Connected.Video: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:49:19 AM,[OMTReceive.Connect],Connected.Audio: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:49:21 AM,[OMTRedirect],Redirecting SAULS-MACBOOK-PRO.LOCAL (addressing-C) to SAULS-MACBOOK-PRO.LOCAL (addressing-D) and monitoring for updates from SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:49:21 AM,[OMTReceive],First redirect of SAULS-MACBOOK-PRO.LOCAL (addressing-C) to SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:49:21 AM,[OMTReceive.Connect],Connected.Metadata: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:49:21 AM,[OMTReceive.Connect],Connected.Video: SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:49:21 AM,[OMTReceive.Connect],Connected.Audio: SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:49:27 AM,[OMTReceive],Redirecting SAULS-MACBOOK-PRO.LOCAL (addressing-C) to
+log: 9/23/2026 9:49:27 AM,[OMTReceive.Connect],Connected.Video: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:49:27 AM,[OMTReceive],Skipping redirect to  due to existing side channel.
+log: 9/23/2026 9:49:27 AM,[OMTReceive],Skipping redirect to  due to existing side channel.
+log: 9/23/2026 9:49:27 AM,[OMTReceive.Connect],Connected.Audio: SAULS-MACBOOK-PRO.LOCAL (addressing-C)
+log: 9/23/2026 9:49:34 AM,[OMTReceive],Skipping redirect to SAULS-MACBOOK-PRO.LOCAL (addressing-D) due to existing side channel.
+log: 9/23/2026 9:49:34 AM,[OMTReceive],Redirecting SAULS-MACBOOK-PRO.LOCAL (addressing-C) to SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:49:34 AM,[OMTReceive.Connect],Connected.Video: SAULS-MACBOOK-PRO.LOCAL (addressing-D)
+log: 9/23/2026 9:49:34 AM,[OMTReceive.Connect],Connected.Audio: SAULS-MACBOOK-PRO.LOCAL (addressing-D)

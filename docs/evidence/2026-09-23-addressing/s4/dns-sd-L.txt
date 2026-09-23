@@ -1,0 +1,9 @@
+Lookup SAULS-MACBOOK-PRO.LOCAL (addressing-M)._omt._tcp.local
+DATE: ---Wed 23 Sep 2026---
+ 9:50:19.308  ...STARTING...
+ 9:50:20.111  SAULS-MACBOOK-PRO\.LOCAL\032(addressing-M)._omt._tcp.local. can be reached at Sauls-MacBook-Pro.local.:6400 (interface 1) Flags: 1
+ 9:50:20.111  SAULS-MACBOOK-PRO\.LOCAL\032(addressing-M)._omt._tcp.local. can be reached at Sauls-MacBook-Pro.local.:6400 (interface 1) Flags: 1
+ 9:50:20.111  SAULS-MACBOOK-PRO\.LOCAL\032(addressing-M)._omt._tcp.local. can be reached at Sauls-MacBook-Pro.local.:6400 (interface 14)
+ 9:50:29.696  SAULS-MACBOOK-PRO\.LOCAL\032(addressing-M)._omt._tcp.local. can be reached at Sauls-MacBook-Pro.local.:6401 (interface 1) Flags: 1
+ 9:50:29.696  SAULS-MACBOOK-PRO\.LOCAL\032(addressing-M)._omt._tcp.local. can be reached at Sauls-MacBook-Pro.local.:6401 (interface 1) Flags: 1
+ 9:50:29.696  SAULS-MACBOOK-PRO\.LOCAL\032(addressing-M)._omt._tcp.local. can be reached at Sauls-MacBook-Pro.local.:6401 (interface 14)

@@ -1,11 +1,14 @@
 // Test harness around upstream libomtnet, used to observe its real behaviour.
 //
-//   send NAME SECONDS          announce NAME and send 640x360 UYVY video (30 fps),
+//   send NAME SECONDS [T=ADDRESS ...]
+//                              announce NAME and send 640x360 UYVY video (30 fps),
 //                              stereo audio with a silent right channel, per-frame
-//                              metadata every 30th frame, and sender info
-//   recv ADDRESS SECONDS [compressed|preview]
+//                              metadata every 30th frame, and sender info; at T
+//                              seconds call SetRedirect(ADDRESS) (empty clears it)
+//   recv ADDRESS SECONDS [compressed|preview|-]
 //                              connect to "MACHINE (Name)" or omt://host:port, set
 //                              tally to program and quality to High, print every frame
+//                              and every change of RedirectAddress
 //   list SECONDS               print what discovery finds
 //
 // One line per event on stdout, so runs can be diffed.
@@ -25,7 +28,7 @@ static class Program
         OMTLogging.SetCallback(line => Console.Error.WriteLine("log: " + line.TrimEnd()));
         switch (args[0])
         {
-            case "send" when args.Length >= 3: return Send(args[1], int.Parse(args[2]));
+            case "send" when args.Length >= 3: return Send(args[1], int.Parse(args[2]), args[3..]);
             case "recv" when args.Length >= 3: return Recv(args[1], int.Parse(args[2]), args.Length > 3 ? args[3] : "");
             case "list": return List(int.Parse(args[1]));
             default: return Usage();
@@ -34,12 +37,20 @@ static class Program
 
     static int Usage()
     {
-        Console.Error.WriteLine("usage: send NAME SECONDS | recv ADDRESS SECONDS [compressed|preview] | list SECONDS");
+        Console.Error.WriteLine("usage: send NAME SECONDS [T=ADDRESS ...] | recv ADDRESS SECONDS [compressed|preview|-] | list SECONDS");
         return 2;
     }
 
-    static int Send(string name, int seconds)
+    static int Send(string name, int seconds, string[] schedule)
     {
+        var redirects = new System.Collections.Generic.List<(double, string)>();
+        foreach (var e in schedule)
+        {
+            int eq = e.IndexOf('=');
+            redirects.Add((double.Parse(e[..eq], System.Globalization.CultureInfo.InvariantCulture), e[(eq + 1)..]));
+        }
+        redirects.Sort((a, b) => a.Item1.CompareTo(b.Item1));
+        int nextRedirect = 0;
         const int w = 640, h = 360, fps = 30, rate = 48000, channels = 2;
         int samples = rate / fps;
         using var send = new OMTSend(name, OMTQuality.Default);
@@ -57,6 +68,12 @@ static class Program
             var lastTally = new OMTTally();
             for (int n = 0; sw.Elapsed.TotalSeconds < seconds; n++)
             {
+                while (nextRedirect < redirects.Count && sw.Elapsed.TotalSeconds >= redirects[nextRedirect].Item1)
+                {
+                    string to = redirects[nextRedirect++].Item2;
+                    send.SetRedirect(to == "" ? null : to);
+                    Console.WriteLine($"send redirect t={sw.Elapsed.TotalSeconds:F1} address=\"{to}\"");
+                }
                 FillUyvy(video, w, h, n);
                 var vf = new OMTMediaFrame
                 {
@@ -113,8 +130,14 @@ static class Program
         recv.SetSuggestedQuality(OMTQuality.High);
         var sw = Stopwatch.StartNew();
         int video = 0, audio = 0;
+        string redirect = null;
         while (sw.Elapsed.TotalSeconds < seconds)
         {
+            if (recv.RedirectAddress != redirect)
+            {
+                redirect = recv.RedirectAddress;
+                Console.WriteLine($"recv redirect t={sw.Elapsed.TotalSeconds:F1} address=\"{redirect}\"");
+            }
             // A fresh struct each time: libomtnet leaves FrameMetadata untouched on
             // frames without metadata (OMTReceive.cs:1059-1072).
             var frame = new OMTMediaFrame();
