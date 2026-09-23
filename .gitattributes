@@ -1,0 +1,5 @@
+# Interop harnesses that exercise the upstream reference implementations
+# (libomtnet in .NET, libvmx in C++). They are test tooling, not part of the
+# Rust implementation, so keep them out of GitHub's language stats.
+interop/** linguist-vendored
+crates/libvmx-ref/csrc/** linguist-vendored
