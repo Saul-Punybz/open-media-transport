@@ -1117,12 +1117,15 @@ mod tests {
         };
         wait_for(|| tx.video_receivers() == 1);
         assert_eq!(tx.send_video(&frame, params, 0, b""), Ok(1));
-        for ts in 1..5 {
+        // No more than the outbox holds: on a slow machine the writer may not
+        // have taken any frame yet, and a fifth would be dropped by design.
+        let n = MAX_QUEUED_AV as i64;
+        for ts in 1..n {
             assert_eq!(tx.send_video(&frame, params, ts, b""), Ok(1));
         }
         let mut sizes = Vec::new();
         let deadline = Instant::now() + Duration::from_secs(3);
-        while sizes.len() < 5 && Instant::now() < deadline {
+        while sizes.len() < MAX_QUEUED_AV && Instant::now() < deadline {
             if let Some(Event::Frame(_, f)) = rx.recv_timeout(Duration::from_millis(100)) {
                 if let ExtendedHeader::Video(_) = f.ext {
                     if sizes.is_empty() {
@@ -1136,7 +1139,7 @@ mod tests {
                 }
             }
         }
-        assert_eq!(sizes.len(), 5);
+        assert_eq!(sizes.len(), MAX_QUEUED_AV);
         assert!(sizes.iter().all(|&n| n < 128 * 64 * 2), "{sizes:?}");
         assert!(
             sizes.iter().max().unwrap() - sizes.iter().min().unwrap() < sizes[0] / 2,
