@@ -50,10 +50,22 @@ impl BitWriter {
     #[inline(always)]
     pub(crate) fn put(&mut self, v: u64, n: u32) {
         if n > 32 {
-            self.put(v >> 32, n - 32);
-            self.put(v & 0xFFFF_FFFF, 32);
-            return;
+            self.put_long(v, n);
+        } else {
+            self.put32(v, n);
         }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn put_long(&mut self, v: u64, n: u32) {
+        self.put32(v >> 32, n - 32);
+        self.put32(v & 0xFFFF_FFFF, 32);
+    }
+
+    /// Appends the low `n <= 32` bits of `v`.
+    #[inline(always)]
+    fn put32(&mut self, v: u64, n: u32) {
         self.acc = (self.acc << n) | (v & ((1u64 << n) - 1));
         self.nbits += n;
         if self.nbits >= 32 {
@@ -77,6 +89,23 @@ impl BitWriter {
         }
         let bl = 32 - n.leading_zeros();
         self.put((1u64 << (2 * bl - 1)) | n as u64, 2 * bl);
+    }
+
+    /// Run code for `run` (nothing if 0) followed by the value code for
+    /// `v >= 1`, written with a single `put` when they fit in 32 bits.
+    #[inline(always)]
+    pub(crate) fn put_run_value(&mut self, run: u32, v: u32) {
+        let vl = 2 * (32 - v.leading_zeros()) - 1;
+        let rbl = 32 - run.leading_zeros();
+        let rl = 2 * rbl;
+        if rl + vl <= 32 {
+            // run == 0 gives rl == 0 and an empty run code.
+            let rc = ((1u64 << rl) >> 1) | run as u64;
+            self.put32((rc << vl) | v as u64, rl + vl);
+        } else {
+            self.put_run(run);
+            self.put_value(v);
+        }
     }
 
     /// Pads with zero bits to the next byte boundary.
@@ -223,6 +252,31 @@ mod tests {
                 bits.chunks(8).map(|c| c.iter().fold(0u8, |acc, &b| (acc << 1) | b as u8)).collect();
             assert_eq!(w.into_bytes(), want);
         }
+    }
+
+    #[test]
+    fn combined_run_value_matches_separate_codes() {
+        let mut seed = 0x0DDB_1A5E_5BAD_5EEDu64;
+        let mut rnd = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let (mut a, mut b) = (BitWriter::default(), BitWriter::default());
+        for _ in 0..100_000 {
+            // Runs up to a whole 8K slice plane; value codes up to 2 * 32768 + 1.
+            let run = match rnd() % 3 {
+                0 => 0,
+                1 => (rnd() % 64) as u32,
+                _ => (rnd() % 200_000) as u32,
+            };
+            let v = (((rnd() % 65_537) as u32) >> (rnd() % 17)).max(1);
+            a.put_run_value(run, v);
+            b.put_run(run);
+            b.put_value(v);
+        }
+        assert!(a.into_bytes() == b.into_bytes());
     }
 
     #[test]

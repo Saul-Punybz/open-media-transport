@@ -98,8 +98,7 @@ pub(crate) fn encode_plane<T: Sample, S: Isa>(
             while nz != 0 {
                 let i = nz.trailing_zeros();
                 run += i - pos;
-                ac.put_run(run);
-                ac.put_value(to_code(zz[i as usize] as i32));
+                ac.put_run_value(run, to_code(zz[i as usize] as i32));
                 run = 0;
                 pos = i + 1;
                 nz &= nz - 1;
