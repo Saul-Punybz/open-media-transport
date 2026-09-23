@@ -39,7 +39,11 @@ fn main() {
         .flag_if_supported("-Wno-narrowing")
         .flag_if_supported("-Wno-#warnings")
         .flag_if_supported("-Wno-cpp");
-    if !b.get_compiler().is_like_clang() {
+    let compiler = b.get_compiler();
+    if compiler.is_like_msvc() {
+        // As upstream's VMXCodec.vcxproj: C++17, standard preprocessor.
+        b.flag("/std:c++17").flag("/Zc:preprocessor");
+    } else if !compiler.is_like_clang() {
         b.define("__declspec(x)", "__attribute__((x))");
     }
     match arch.as_str() {

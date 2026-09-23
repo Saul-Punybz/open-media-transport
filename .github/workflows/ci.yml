@@ -7,6 +7,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # The libvmx commit the port is pinned to (docs/UPSTREAM.md) and the
+  # current upstream head, checked for drift.
+  LIBVMX_PINNED: 544bcfb
+  LIBVMX_LATEST: a1828cb
 
 jobs:
   test:
@@ -14,19 +18,46 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # ubuntu-latest and windows-latest run the SSE2 kernels on real x86_64,
+        # ubuntu-24.04-arm and macos-latest the NEON kernels.
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
-      # reference/ (upstream C++ and C#) is not in the repository, so the
-      # libvmx conformance tests skip themselves here.
+      # The upstream C++ codec, which libvmx-ref builds (build.rs) so the
+      # vmx-codec conformance tests compare against it.
+      - name: Fetch libvmx
+        run: |
+          git clone -q https://github.com/openmediatransport/libvmx reference/libvmx
+          git -C reference/libvmx checkout -q "$LIBVMX_PINNED"
+          git -C reference/libvmx worktree add -q ../libvmx-latest "$LIBVMX_LATEST"
       - run: cargo build --workspace --all-targets
-      - run: cargo test -p vmx-codec -p open-media-transport -p omt-cli
+      # The libvmx conformance tests run in their own steps below.
+      - run: cargo test -p vmx-codec -p open-media-transport -p omt-cli -- --skip matches_libvmx
         # A hung test fails the job instead of running until GitHub's limit.
         timeout-minutes: 15
+      # Fails if libvmx-ref came out as the empty stub, so a skipped
+      # conformance run cannot pass as a green one.
+      - name: Conformance against libvmx ${{ env.LIBVMX_PINNED }} (pinned)
+        timeout-minutes: 10
+        run: |
+          cargo test -p vmx-codec --test conformance -- --nocapture 2>&1 | tee conformance-pinned.log
+          if grep -q "skipping conformance" conformance-pinned.log; then echo "::error::conformance tests skipped"; exit 1; fi
+          grep -E "^test result: ok\. [1-9]" conformance-pinned.log
+      - name: Conformance against libvmx ${{ env.LIBVMX_LATEST }} (upstream head)
+        timeout-minutes: 10
+        env:
+          LIBVMX_SRC: ${{ github.workspace }}/reference/libvmx-latest/src
+        run: |
+          cargo test -p vmx-codec --test conformance -- --nocapture 2>&1 | tee conformance-latest.log
+          if grep -q "skipping conformance" conformance-latest.log; then echo "::error::conformance tests skipped"; exit 1; fi
+          grep -E "^test result: ok\. [1-9]" conformance-latest.log
       - run: cargo clippy -p open-media-transport -p omt-cli --all-targets -- -D warnings
       - run: cargo fmt -p open-media-transport -p omt-cli --check
