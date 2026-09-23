@@ -90,22 +90,36 @@ pub(crate) fn encode_plane<T: Sample, S: Isa>(
             }
             dc_pred = d;
 
-            // The DC slot counts as a zero in the AC sequence.
-            run += 1;
-            for &c in &zz[1..] {
-                if c == 0 {
-                    run += 1;
-                } else {
-                    ac.put_run(run);
-                    ac.put_value(to_code(c as i32));
-                    run = 0;
-                }
+            // Walk the non-zero coefficients only, as libvmx does with its
+            // movemask + tzcnt loop. The DC slot (bit 0) counts as a zero in
+            // the AC sequence.
+            let mut nz = nonzero_mask(&zz) & !1;
+            let mut pos = 0;
+            while nz != 0 {
+                let i = nz.trailing_zeros();
+                run += i - pos;
+                ac.put_run(run);
+                ac.put_value(to_code(zz[i as usize] as i32));
+                run = 0;
+                pos = i + 1;
+                nz &= nz - 1;
             }
+            run += 64 - pos;
         }
     }
     ac.put_run(run);
     ac.align();
     dc.align();
+}
+
+/// Bit `i` is set when `zz[i]` is non-zero.
+#[inline(always)]
+fn nonzero_mask(zz: &[i16; 64]) -> u64 {
+    let mut m = 0u64;
+    for (i, &c) in zz.iter().enumerate() {
+        m |= ((c != 0) as u64) << i;
+    }
+    m
 }
 
 /// Decodes one plane of one slice into `rows` (`16 * stride` samples).

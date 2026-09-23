@@ -30,6 +30,10 @@ pub(crate) fn from_code(code: u64) -> i16 {
 }
 
 /// Growable MSB-first bit writer.
+///
+/// Bits collect in a 64-bit accumulator and leave it 32 at a time; only the
+/// low `nbits` (< 32 between calls) bits of `acc` are pending, anything
+/// above them has already been written.
 #[derive(Default)]
 pub(crate) struct BitWriter {
     buf: Vec<u8>,
@@ -50,14 +54,11 @@ impl BitWriter {
             self.put(v & 0xFFFF_FFFF, 32);
             return;
         }
-        if n == 0 {
-            return;
-        }
         self.acc = (self.acc << n) | (v & ((1u64 << n) - 1));
         self.nbits += n;
-        while self.nbits >= 8 {
-            self.nbits -= 8;
-            self.buf.push((self.acc >> self.nbits) as u8);
+        if self.nbits >= 32 {
+            self.nbits -= 32;
+            self.buf.extend_from_slice(&((self.acc >> self.nbits) as u32).to_be_bytes());
         }
     }
 
@@ -80,14 +81,15 @@ impl BitWriter {
 
     /// Pads with zero bits to the next byte boundary.
     pub(crate) fn align(&mut self) {
-        if self.nbits > 0 {
-            let pad = 8 - self.nbits;
-            self.put(0, pad);
-        }
+        self.put(0, (8 - self.nbits % 8) % 8);
     }
 
     pub(crate) fn into_bytes(mut self) -> Vec<u8> {
         self.align();
+        while self.nbits > 0 {
+            self.nbits -= 8;
+            self.buf.push((self.acc >> self.nbits) as u8);
+        }
         self.buf
     }
 }
@@ -183,6 +185,43 @@ mod tests {
                 continue;
             }
             assert_eq!(from_code(to_code(v) as u64) as i32, v);
+        }
+    }
+
+    #[test]
+    fn writer_matches_bitwise_reference() {
+        let mut seed = 0x1234_5678_9ABC_DEF1u64;
+        let mut rnd = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for _ in 0..200 {
+            let mut w = BitWriter::default();
+            let mut bits: Vec<bool> = Vec::new();
+            for _ in 0..(rnd() % 500) {
+                match rnd() % 8 {
+                    0 => {
+                        w.align();
+                        while bits.len() % 8 != 0 {
+                            bits.push(false);
+                        }
+                    }
+                    k => {
+                        let n = if k == 1 { (rnd() % 65) as u32 } else { (rnd() % 34) as u32 };
+                        let v = rnd();
+                        w.put(v, n);
+                        bits.extend((0..n).rev().map(|i| (v >> i) & 1 == 1));
+                    }
+                }
+            }
+            while bits.len() % 8 != 0 {
+                bits.push(false);
+            }
+            let want: Vec<u8> =
+                bits.chunks(8).map(|c| c.iter().fold(0u8, |acc, &b| (acc << 1) | b as u8)).collect();
+            assert_eq!(w.into_bytes(), want);
         }
     }
 
