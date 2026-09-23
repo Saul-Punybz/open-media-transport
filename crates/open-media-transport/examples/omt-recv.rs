@@ -1,37 +1,50 @@
-//! Receives from an OMT sender and decodes what arrives.
+//! Receives from an OMT sender and decodes what arrives with
+//! `open_media_transport::media`.
 //!
 //! ```sh
 //! cargo run -p open-media-transport --example omt-recv -- 127.0.0.1:6400 5
-//! cargo run -p open-media-transport --example omt-recv -- "MY-MAC.LOCAL (Camera)" 5
+//! cargo run -p open-media-transport --example omt-recv -- "MY-MAC.LOCAL (Camera)" 5 --format bgra
 //! cargo run -p open-media-transport --example omt-recv -- omt://my-mac.local:6400 5
 //! ```
 //!
 //! A full name is looked up with DNS-SD, and looked up again whenever the
 //! receiver reconnects; an `omt://` URL is resolved with DNS (§8). Redirects
 //! are followed and printed (§9). A third argument
-//! `preview` asks for 1/8 preview video (§6.2); preview frames are decoded
-//! with `decode_preview` and hashed as UYVY, like libomtnet delivers them.
+//! `preview` asks for 1/8 preview video (§6.2). `--format` picks the decoded
+//! layout with libomtnet's names: `uyvy` (default), `uyvyorbgra`, `bgra`,
+//! `uyvyoruyva`, `uyvyoruyvaorp216orpa16` (or `hbd`), `p216`.
 //!
-//! Video is decoded to UYVY with `vmx-codec`. For frames that carry per-frame
-//! metadata it prints a `pixels` line in the same format as
-//! `interop/libomtnet-harness recv`, so the two receivers' output can be diffed
-//! when both watch the same sender. If the metadata is the harness's
-//! `<HarnessFrame N="n" />`, it also compares the pixels with the pattern the
-//! harness sent and prints the PSNR.
+//! For frames that carry per-frame metadata it prints a `pixels` line in the
+//! same format as `interop/libomtnet-harness recv`, hashing the whole decoded
+//! buffer as libomtnet delivers it, so the two receivers' output can be diffed
+//! when both watch the same sender with the same format. Audio frames print an
+//! `audio` line with a hash of the decoded planar samples, likewise. If the
+//! metadata is the harness's `<HarnessFrame N="n" />` and the layout is UYVY,
+//! it also compares the pixels with the pattern the harness sent and prints
+//! the PSNR.
 
 use std::net::ToSocketAddrs;
 use std::time::{Duration, Instant};
 
 use open_media_transport::command::{classify, Message, Quality, Tally};
-use open_media_transport::frame::{ExtendedHeader, VideoFlags, CODEC_FPA1, CODEC_VMX1};
+use open_media_transport::frame::ExtendedHeader;
+use open_media_transport::media::{Media, MediaDecoder, PreferredVideoFormat, VideoFormat};
 use open_media_transport::receiver::{Event, Receiver, ReceiverConfig};
-use vmx_codec::{Decoder, PixelFormat};
 
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let target = args
-        .next()
-        .expect("usage: omt-recv HOST:PORT|\"MACHINE (Name)\"|omt://HOST:PORT [SECONDS]");
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let format = match args.iter().position(|a| a == "--format") {
+        Some(i) => {
+            let name = args.get(i + 1).expect("--format needs a value").clone();
+            args.drain(i..i + 2);
+            parse_format(&name)
+        }
+        None => PreferredVideoFormat::Uyvy,
+    };
+    let mut args = args.into_iter();
+    let target = args.next().expect(
+        "usage: omt-recv HOST:PORT|\"MACHINE (Name)\"|omt://HOST:PORT [SECONDS] [preview] [--format F]",
+    );
     println!("connecting to {target}");
     let seconds: u64 = args.next().map(|s| s.parse().unwrap()).unwrap_or(5);
     let preview = args.next().as_deref() == Some("preview");
@@ -55,7 +68,7 @@ fn main() {
             .expect("no address");
         Receiver::connect(addr, config).expect("connect")
     };
-    let mut decoder: Option<(i32, i32, Decoder)> = None;
+    let mut decoder = MediaDecoder::new(format);
     let (mut video, mut audio) = (0u32, 0u32);
     let (mut silent_ch1, mut audio_rms) = (true, 0.0f64);
     let deadline = Instant::now() + Duration::from_secs(seconds);
@@ -83,106 +96,93 @@ fn main() {
                 continue;
             }
         };
-        match f.ext {
-            ExtendedHeader::None => {
-                let kind = match classify(&f.data) {
-                    Message::Command(c) => format!("command {c:?}"),
-                    Message::SenderInfo(_) => "sender-info".into(),
-                    Message::Redirect(_) => "redirect".into(),
-                    Message::QualityOther(_) => "quality".into(),
-                    Message::Application(_) => "application".into(),
-                };
-                println!("metadata {channel:?} {kind} xml=\"{}\"", printable(&f.data));
+        if let ExtendedHeader::None = f.ext {
+            let kind = match classify(&f.data) {
+                Message::Command(c) => format!("command {c:?}"),
+                Message::SenderInfo(_) => "sender-info".into(),
+                Message::Redirect(_) => "redirect".into(),
+                Message::QualityOther(_) => "quality".into(),
+                Message::Application(_) => "application".into(),
+            };
+            println!("metadata {channel:?} {kind} xml=\"{}\"", printable(&f.data));
+            continue;
+        }
+        let media = match decoder.decode(&f) {
+            Ok(m) => m,
+            Err(e) => {
+                println!("decode error: {e}");
+                continue;
             }
-            ExtendedHeader::Video(v) => {
+        };
+        match media {
+            Some(Media::Video(v)) => {
                 video += 1;
-                assert_eq!(v.codec, CODEC_VMX1, "unexpected video codec");
-                let (w, h) = (v.width, v.height);
-                if decoder.as_ref().map(|d| (d.0, d.1)) != Some((w, h)) {
-                    decoder = Some((w, h, Decoder::new(w as usize, h as usize).expect("decoder")));
+                let fm = printable(&v.metadata);
+                if video == 1 || !v.metadata.is_empty() {
+                    println!(
+                        "video ts={} {}x{} codec={} flags={} cs={} rate={}/{} meta=\"{fm}\"",
+                        v.timestamp,
+                        v.width,
+                        v.height,
+                        fourcc(v.format.fourcc()),
+                        v.flags.0,
+                        v.color_space,
+                        v.frame_rate_n,
+                        v.frame_rate_d,
+                    );
                 }
-                let dec = &mut decoder.as_mut().unwrap().2;
-                if v.flags.contains(VideoFlags::PREVIEW) {
-                    let pv = dec.decode_preview(&f.data, false).expect("decode preview");
-                    if video == 1 || !f.metadata.is_empty() {
-                        let uyvy = planar_to_uyvy(&pv);
-                        println!(
-                            "preview {}x{} data={} meta=\"{}\"",
-                            pv.width,
-                            pv.height,
-                            f.data.len(),
-                            printable(&f.metadata)
-                        );
-                        if !f.metadata.is_empty() {
-                            println!(
-                                "pixels {} fnv1a64={:016x} stride={}",
-                                printable(&f.metadata),
-                                fnv1a64(&uyvy),
-                                pv.width * 2
-                            );
-                        }
-                    }
-                    continue;
-                }
-                let px = dec.decode(&f.data, PixelFormat::Uyvy).expect("decode VMX1");
-                if !f.metadata.is_empty() {
-                    let fm = printable(&f.metadata);
-                    let plane = &px.planes[0];
+                if !v.metadata.is_empty() {
                     println!(
                         "pixels {fm} fnv1a64={:016x} stride={}",
-                        fnv1a64(&plane.data),
-                        plane.stride
+                        fnv1a64(&v.data),
+                        v.stride
                     );
-                    if let Some(n) = harness_frame_number(&f.metadata) {
-                        let psnr = psnr(&plane.data, &harness_pattern(w as usize, h as usize, n));
+                    if let (Some(n), VideoFormat::Uyvy, false) =
+                        (harness_frame_number(&v.metadata), v.format, v.is_preview())
+                    {
+                        let psnr = psnr(&v.data, &harness_pattern(v.width, v.height, n));
                         println!("psnr N={n} {psnr:.2} dB");
                     }
                 }
             }
-            ExtendedHeader::Audio(a) => {
+            Some(Media::Audio(a)) => {
                 audio += 1;
-                assert_eq!(a.codec, CODEC_FPA1, "unexpected audio codec");
-                // FPA1: planar f32, channels whose bit is clear are omitted (A2, A3).
-                let spc = a.samples_per_channel as usize;
-                let mut present = f.data.chunks_exact(spc * 4);
-                for ch in 0..a.channels as usize {
-                    let active = a.active_channels & (1 << ch) != 0;
-                    let samples: Vec<f32> = if active {
-                        present
-                            .next()
-                            .expect("audio data shorter than active channels")
-                            .chunks_exact(4)
-                            .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
-                            .collect()
-                    } else {
-                        vec![0.0; spc]
-                    };
-                    if ch == 0 {
-                        let sum: f64 = samples.iter().map(|&s| (s as f64) * (s as f64)).sum();
-                        audio_rms = (sum / spc as f64).sqrt();
-                    } else if ch == 1 && samples.iter().any(|&s| s != 0.0) {
-                        silent_ch1 = false;
-                    }
+                let bytes: Vec<u8> = a.samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+                println!(
+                    "audio ts={} rate={} ch={} spc={} fnv1a64={:016x}",
+                    a.timestamp,
+                    a.sample_rate,
+                    a.channels,
+                    a.samples_per_channel,
+                    fnv1a64(&bytes)
+                );
+                let ch0 = a.channel(0);
+                let sum: f64 = ch0.iter().map(|&s| (s as f64) * (s as f64)).sum();
+                audio_rms = (sum / ch0.len().max(1) as f64).sqrt();
+                if a.channels > 1 && a.channel(1).iter().any(|&s| s != 0.0) {
+                    silent_ch1 = false;
                 }
             }
+            Some(Media::Metadata(_)) | None => {}
         }
     }
     println!("done video={video} audio={audio} ch0_rms={audio_rms:.4} ch1_silent={silent_ch1}");
 }
 
-/// Packs a `Yuv422p` frame (what `decode_preview` returns) as UYVY.
-fn planar_to_uyvy(f: &vmx_codec::Frame) -> Vec<u8> {
-    let (yp, up, vp) = (&f.planes[0], &f.planes[1], &f.planes[2]);
-    let mut out = Vec::with_capacity(f.width * 2 * f.height);
-    for y in 0..f.height {
-        for x in (0..f.width).step_by(2) {
-            out.push(up.data[y * up.stride + x / 2]);
-            out.push(yp.data[y * yp.stride + x]);
-            out.push(vp.data[y * vp.stride + x / 2]);
-            out.push(yp.data[y * yp.stride + x + 1]);
-        }
+fn parse_format(name: &str) -> PreferredVideoFormat {
+    match name.to_ascii_lowercase().as_str() {
+        "uyvy" => PreferredVideoFormat::Uyvy,
+        "uyvyorbgra" => PreferredVideoFormat::UyvyOrBgra,
+        "bgra" => PreferredVideoFormat::Bgra,
+        "uyvyoruyva" => PreferredVideoFormat::UyvyOrUyva,
+        "uyvyoruyvaorp216orpa16" | "hbd" => PreferredVideoFormat::UyvyOrUyvaOrP216OrPa16,
+        "p216" => PreferredVideoFormat::P216,
+        other => panic!("unknown --format {other}"),
     }
-    out
+}
+
+fn fourcc(c: u32) -> String {
+    String::from_utf8_lossy(&c.to_le_bytes()).into_owned()
 }
 
 /// The UYVY test pattern `libomtnet-harness send` generates for frame `n`.
