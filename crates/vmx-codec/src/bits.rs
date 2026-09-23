@@ -273,7 +273,9 @@ impl<'a> AcCursor<'a> {
         let head = 1 + run as u32; // `0` or `10`
         let z = (w << head).leading_zeros();
         if z > 14 {
-            return self.ac_symbol_slow(head, run == 1);
+            let (c, sym) = self.ac_symbol_slow(head, run == 1)?;
+            *self = c;
+            return Ok(sym);
         }
         let n = z + 2;
         let v = (w << (head + z)) >> (64 - n);
@@ -281,15 +283,16 @@ impl<'a> AcCursor<'a> {
         Ok(if run == 1 { AcSymbol::Run(v) } else { AcSymbol::Value(v) })
     }
 
-    /// Long or corrupt code: the bit-by-bit path, errors included.
+    /// Long or corrupt code: the bit-by-bit path, errors included. Out of
+    /// line and by value, so the caller's cursor never has its address taken
+    /// (which would keep it out of registers).
     #[cold]
     #[inline(never)]
-    fn ac_symbol_slow(&mut self, head: u32, run: bool) -> Result<AcSymbol, Corrupt> {
+    fn ac_symbol_slow(self, head: u32, run: bool) -> Result<(Self, AcSymbol), Corrupt> {
         let mut r = self.reader();
         r.pos += head as usize;
         let v = r.code_tail()?;
-        *self = Self::new(r);
-        Ok(if run { AcSymbol::Run(v) } else { AcSymbol::Value(v) })
+        Ok((Self::new(r), if run { AcSymbol::Run(v) } else { AcSymbol::Value(v) }))
     }
 }
 
