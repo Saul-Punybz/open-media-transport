@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 22 Sep 2026 — v0.1.0 published as a pre-release on GitHub; waiting for tester reports.
+**Last updated:** 23 Sep 2026 — code gaps batch in progress: addressing (connect by name/URL, re-resolve, redirect), decoding receive API + 10-bit snapshots, and the discovery server are merged and verified against libomtnet; SIMD for vmx-codec and the Caudal-M12 prerequisites are still on branches.
 
 ## RESUME HERE
 
@@ -70,6 +70,13 @@ the other three archives have not been run. **Published 22 Sep 2026 as a pre-rel
 confirmed downloadable without authentication; archive checksums in the release notes and in
 the local `dist/v0.1.0/SHA256SUMS`. `release.yml` builds `omt` for four targets into a
 **draft** GitHub release when a `v*` tag is pushed.
+
+
+**23 Sep 2026 batch (merged to main, each verified against libomtnet on this Mac; evidence in `docs/evidence/2026-09-23-*`):**
+- **Discovery server (§10)** — `discovery_server` module (client + server), `Discovery::with_server`, `omt discovery-server`, `--discovery-server`/`--no-mdns`. Our client with upstream's OMTDiscoveryServer and our server with libomtnet clients, both ways; client bytes identical to libomtnet's. S1–S6 Live.
+- **Addressing (§8, §9)** — `address` module (`Address`, `Directory`), `Receiver::connect_to` by full name or `omt://` URL, re-resolve on every reconnect (shown: libomtnet sender restarted on another port, receiver came back); redirect on both sides (`Sender::set_redirect`, `Event::Redirect`), redirect bytes identical to libomtnet's. Found a libomtnet bug: after a cleared redirect, a late-joining libomtnet receiver never follows again. Chains (X3) and X4 only tested between our own senders.
+- **Decoding receive API** — `media` module (`MediaDecoder`, libomtnet's preferred-format rules): UYVY, UYVA, BGRA/BGRX, P216, PA16, previews, f32 planar audio — byte-identical to libomtnet's own decoder in 23 live cases. `omt send --10bit` (P216) and 16-bit PNG snapshots (`omt recv --snapshot x.png`).
+Still only libomtnet on one Mac: **no vMix, OBS or Pi.**
 
 **Next step:** get reports from real products (`TESTING.md` §3) and record them in
 `docs/INTEROP.md`. Code gaps: redirect (§9), discovery server (§10), re-resolving a source

@@ -4,7 +4,7 @@
 //! Like libomtnet, it opens one connection for video + metadata and a second
 //! one for audio (T5), and sends the same commands in the same order on each
 //! (§4.3). Frames are returned as they arrive, protocol commands included;
-//! decoding is left to the caller.
+//! decoding is left to the caller, or to [`crate::media::MediaDecoder`].
 //!
 //! **Addressing (§8).** A receiver is given a socket address, a full name
 //! `MACHINE (Name)` or an `omt://host:port` URL ([`Address`]). A name is
