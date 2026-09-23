@@ -43,6 +43,35 @@ fn le16(b: &[u8], i: usize) -> u16 {
     u16::from_le_bytes([b[2 * i], b[2 * i + 1]])
 }
 
+/// Splits one row of packed 4:2:2 (every 4-byte group holds Y at `YO` and
+/// `YO + 2`, U at `UO`, V at `VO`) into its planes. One pass with constant
+/// offsets, which LLVM turns into de-interleaving vector loads.
+#[inline(always)]
+fn split_packed<const YO: usize, const UO: usize, const VO: usize>(
+    src: &[u8],
+    y: &mut [u8],
+    u: &mut [u8],
+    v: &mut [u8],
+) {
+    for (((s, y), u), v) in src.chunks_exact(4).zip(y.chunks_exact_mut(2)).zip(u.iter_mut()).zip(v.iter_mut()) {
+        y[0] = s[YO];
+        y[1] = s[YO + 2];
+        *u = s[UO];
+        *v = s[VO];
+    }
+}
+
+/// Inverse of [`split_packed`].
+#[inline(always)]
+fn merge_packed<const YO: usize, const UO: usize, const VO: usize>(y: &[u8], u: &[u8], v: &[u8], dst: &mut [u8]) {
+    for (((d, y), u), v) in dst.chunks_exact_mut(4).zip(y.chunks_exact(2)).zip(u).zip(v) {
+        d[YO] = y[0];
+        d[YO + 2] = y[1];
+        d[UO] = *u;
+        d[VO] = *v;
+    }
+}
+
 /// Copies an 8-bit frame into the planes. Padding rows and columns keep
 /// whatever the planes held before, as in libvmx.
 pub(crate) fn frame_to_planes8(f: &Frame, l: &Layout, interlaced: bool, pl: &mut Planes<u8>) {
@@ -52,25 +81,16 @@ pub(crate) fn frame_to_planes8(f: &Frame, l: &Layout, interlaced: bool, pl: &mut
         match f.format {
             PixelFormat::Uyvy | PixelFormat::Yuy2 | PixelFormat::Uyva => {
                 let src = f.row(0, ir, 2 * w);
-                let (yo, uo, vo) = if f.format == PixelFormat::Yuy2 { (0, 1, 3) } else { (1, 0, 2) };
-                {
-                    let y = pl.row_mut(0, r, w);
-                    for i in 0..cw {
-                        y[2 * i] = src[4 * i + yo];
-                        y[2 * i + 1] = src[4 * i + yo + 2];
-                    }
-                }
-                {
-                    let u = pl.row_mut(1, r, cw);
-                    for i in 0..cw {
-                        u[i] = src[4 * i + uo];
-                    }
-                }
-                {
-                    let v = pl.row_mut(2, r, cw);
-                    for i in 0..cw {
-                        v[i] = src[4 * i + vo];
-                    }
+                let [yp, up, vp, _] = &mut pl.data;
+                let (y, u, v) = (
+                    &mut yp[r * pl.strides[0]..][..w],
+                    &mut up[r * pl.strides[1]..][..cw],
+                    &mut vp[r * pl.strides[2]..][..cw],
+                );
+                if f.format == PixelFormat::Yuy2 {
+                    split_packed::<0, 1, 3>(src, y, u, v);
+                } else {
+                    split_packed::<1, 0, 2>(src, y, u, v);
                 }
                 if f.format == PixelFormat::Uyva {
                     pl.row_mut(3, r, w).copy_from_slice(f.row(1, ir, w));
@@ -149,15 +169,13 @@ pub(crate) fn planes8_to_frame(pl: &Planes<u8>, l: &Layout, interlaced: bool, f:
         let Some(ir) = l.image_row(r, interlaced) else { continue };
         match fmt {
             PixelFormat::Uyvy | PixelFormat::Yuy2 | PixelFormat::Uyva => {
-                let (yo, uo, vo) = if fmt == PixelFormat::Yuy2 { (0, 1, 3) } else { (1, 0, 2) };
                 let (y, u, v) = (pl.row(0, r, w), pl.row(1, r, cw), pl.row(2, r, cw));
                 let s = f.planes[0].stride;
                 let dst = &mut f.planes[0].data[ir * s..ir * s + 2 * w];
-                for i in 0..cw {
-                    dst[4 * i + yo] = y[2 * i];
-                    dst[4 * i + yo + 2] = y[2 * i + 1];
-                    dst[4 * i + uo] = u[i];
-                    dst[4 * i + vo] = v[i];
+                if fmt == PixelFormat::Yuy2 {
+                    merge_packed::<0, 1, 3>(y, u, v, dst);
+                } else {
+                    merge_packed::<1, 0, 2>(y, u, v, dst);
                 }
                 if fmt == PixelFormat::Uyva {
                     let s = f.planes[1].stride;
