@@ -68,10 +68,15 @@ impl Decoder {
 
     /// Length of the DC-only prefix of `data` that [`Decoder::decode_preview`]
     /// needs (`VMX_GetEncodedPreviewLength`).
+    ///
+    /// libvmx sizes the header from the DC shift (5 bytes if non-zero, else
+    /// 3), which assumes the extended header is written only with a non-zero
+    /// shift — true of every stream libvmx writes. This uses the header the
+    /// stream actually has, so an extended header with a shift of 0 (valid
+    /// input, found by fuzzing) gets a prefix that still decodes.
     pub fn preview_len(&self, data: &[u8]) -> Result<usize, Error> {
         let c = parse(&self.layout, data)?;
-        let header = if c.dc_shift > 0 { 5 } else { 3 };
-        Ok(header + c.dc.iter().map(|s| s.len() + 4).sum::<usize>())
+        Ok(c.header_len + c.dc.iter().map(|s| s.len() + 4).sum::<usize>())
     }
 
     /// Decodes a frame into a newly allocated, tightly packed frame.
@@ -228,4 +233,26 @@ fn decode_slices<T: Sample + DecodeOut>(
             .collect();
         handles.into_iter().try_for_each(|h| h.join().expect("decoder worker panicked"))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Found by the `vmx_decode` fuzz target (docs/evidence/2026-09-23-m12-prereqs):
+    /// an extended header with a DC shift of 0. The preview prefix must cover
+    /// the 5-byte header, or it decodes differently from the whole frame.
+    #[test]
+    fn preview_len_counts_extended_header_with_zero_shift() {
+        let stream = [0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00];
+        let mut d = Decoder::new(32, 16).unwrap();
+        let n = d.preview_len(&stream).unwrap();
+        assert!(n <= stream.len());
+        let full = d.decode_preview(&stream, false);
+        let prefix = d.decode_preview(&stream[..n], false);
+        assert_eq!(full.is_ok(), prefix.is_ok(), "{full:?} / {prefix:?}");
+        if let (Ok(a), Ok(b)) = (full, prefix) {
+            assert_eq!(a.planes, b.planes);
+        }
+    }
 }

@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 23 Sep 2026 — code gaps batch in progress: addressing (connect by name/URL, re-resolve, redirect), decoding receive API + 10-bit snapshots, and the discovery server are merged and verified against libomtnet; SIMD for vmx-codec and the Caudal-M12 prerequisites are still on branches.
+**Last updated:** 23 Sep 2026 — code gaps batch in progress: addressing (connect by name/URL, re-resolve, redirect), decoding receive API + 10-bit snapshots, and the discovery server are merged and verified against libomtnet; SIMD for vmx-codec and the Caudal-M12 prerequisites merged too.
 
 ## RESUME HERE
 
@@ -76,6 +76,8 @@ the local `dist/v0.1.0/SHA256SUMS`. `release.yml` builds `omt` for four targets 
 - **Discovery server (§10)** — `discovery_server` module (client + server), `Discovery::with_server`, `omt discovery-server`, `--discovery-server`/`--no-mdns`. Our client with upstream's OMTDiscoveryServer and our server with libomtnet clients, both ways; client bytes identical to libomtnet's. S1–S6 Live.
 - **Addressing (§8, §9)** — `address` module (`Address`, `Directory`), `Receiver::connect_to` by full name or `omt://` URL, re-resolve on every reconnect (shown: libomtnet sender restarted on another port, receiver came back); redirect on both sides (`Sender::set_redirect`, `Event::Redirect`), redirect bytes identical to libomtnet's. Found a libomtnet bug: after a cleared redirect, a late-joining libomtnet receiver never follows again. Chains (X3) and X4 only tested between our own senders.
 - **Decoding receive API** — `media` module (`MediaDecoder`, libomtnet's preferred-format rules): UYVY, UYVA, BGRA/BGRX, P216, PA16, previews, f32 planar audio — byte-identical to libomtnet's own decoder in 23 live cases. `omt send --10bit` (P216) and 16-bit PNG snapshots (`omt recv --snapshot x.png`).
+- **vmx-codec SIMD** — NEON (aarch64) and SSE2 (x86_64) kernels in `src/simd.rs`, the only module allowed `unsafe` (crate went `forbid` → `deny`; safe routes compiled to scalar and were slower, see BENCH.md). 1080p one thread on the M4: encode 111 → 341 fps at OMT q80 (libvmx 327–339), 45 → 137 at q98 (libvmx 142); decode 454 → ~1120 (libvmx 1252), 63 → 101 (libvmx 135). Still byte-identical to libvmx (conformance on aarch64, and x86_64 under Rosetta). No AVX2. First real x86 run is CI.
+- **M12 prerequisites** — `Sender::send_encoded_video` (pre-encoded VMX1; a libomtnet receiver decoded it to identical pixels), `SenderConfig::encoder_threads`, `SendError` instead of panics (**breaking:** `send_video`/`send_audio` return `Result<usize, SendError>`), sender/peer/receiver stats, one shared `Discovery` with interface selection (`DiscoveryConfig`), bounded `Drop` (2 s), and a `vmx_decode` fuzz target. It found `preview_len` miscounting an extended header with DC shift 0 — fixed, regression test in `decoder.rs`.
 Still only libomtnet on one Mac: **no vMix, OBS or Pi.**
 
 **Next step:** get reports from real products (`TESTING.md` §3) and record them in

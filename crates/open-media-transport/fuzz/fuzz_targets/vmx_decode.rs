@@ -37,8 +37,8 @@ fuzz_target!(|data: &[u8]| {
     let _ = dec.info(stream);
     // The preview needs only the DC prefix (`VMX_GetEncodedPreviewLength`):
     // whatever it decodes from the whole frame it must decode from the prefix.
-    // Known to fail for the extended header with a DC shift of 0
-    // (docs/evidence/2026-09-23-m12-prereqs).
+    // Once failed for the extended header with a DC shift of 0
+    // (docs/evidence/2026-09-23-m12-prereqs), fixed in `preview_len`.
     if let Ok(n) = dec.preview_len(stream) {
         assert!(n <= stream.len(), "preview_len {n} > {}", stream.len());
         let alpha = sel & 0x20 != 0;

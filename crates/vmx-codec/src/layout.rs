@@ -101,6 +101,8 @@ pub(crate) struct Container<'a> {
     pub interlaced: bool,
     pub quality: i32,
     pub dc_shift: u32,
+    /// Bytes before the first slice: 3, or 5 with the extended header.
+    pub header_len: usize,
     pub dc: Vec<&'a [u8]>,
     /// Empty when the frame carries only the DC (preview) part.
     pub ac: Vec<&'a [u8]>,
@@ -153,7 +155,7 @@ pub(crate) fn parse<'a>(layout: &Layout, data: &'a [u8]) -> Result<Container<'a>
     } else {
         Vec::new()
     };
-    Ok(Container { interlaced: format != 0 && layout.interlace_capable(), quality, dc_shift, dc, ac })
+    Ok(Container { interlaced: format != 0 && layout.interlace_capable(), quality, dc_shift, header_len: 3 + offset, dc, ac })
 }
 
 /// Writes a compressed frame (port of `VMX_SaveTo`).
