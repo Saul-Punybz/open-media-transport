@@ -1,0 +1,10 @@
+thread '<unnamed>' (401606) panicked at fuzz_targets/vmx_decode.rs:45:9:
+assertion `left == right` failed
+  left: true
+ right: false
+Base64: IAAQAAUDAABQAQ8AAAAwkICfEjgAAAEAAAAAAAAAAAAAAAAAAAC1Z02XQlkI0UqsLZRok2dbRSDDLQqkt6ztKg==
+stat::number_of_executed_units: 31400
+stat::average_exec_per_sec:     15700
+stat::new_units_added:          445
+stat::slowest_unit_time_sec:    0
+stat::peak_rss_mb:              402

@@ -1,0 +1,3 @@
+full UYVY: 5 tagged frames, 5 with pixels identical to vmx_codec's decode
+compressed-only: 5 tagged frames, 5 with the length we sent
+preview: 5 tagged frames, sizes ['80x45'], flags ['8'], 5 carrying the full bitstream (P4)

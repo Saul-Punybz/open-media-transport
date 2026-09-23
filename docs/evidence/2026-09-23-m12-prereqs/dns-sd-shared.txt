@@ -1,0 +1,8 @@
+Browsing for _omt._tcp.local.
+DATE: ---Wed 23 Sep 2026---
+10:11:47.224  ...STARTING...
+Timestamp     A/R    Flags  if Domain               Service Type         Instance Name
+10:11:49.665  Add        2  14 local.               _omt._tcp.           SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-mdns-b)
+10:11:49.791  Add        2  14 local.               _omt._tcp.           SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-mdns-a)
+10:11:53.772  Rmv        0  14 local.               _omt._tcp.           SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-mdns-a)
+10:11:56.783  Rmv        0  14 local.               _omt._tcp.           SAULS-MACBOOK-PRO.LOCAL (m12-prereqs-mdns-b)
