@@ -1,6 +1,6 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 23 Sep 2026 — code gaps batch in progress: addressing (connect by name/URL, re-resolve, redirect), decoding receive API + 10-bit snapshots, and the discovery server are merged and verified against libomtnet; SIMD for vmx-codec and the Caudal-M12 prerequisites merged too.
+**Last updated:** 23 Sep 2026 (evening) — pre-testing-week batch in flight (see "In flight" below). Earlier today: addressing (connect by name/URL, re-resolve, redirect), decoding receive API + 10-bit snapshots, and the discovery server are merged and verified against libomtnet; SIMD for vmx-codec and the Caudal-M12 prerequisites merged too.
 
 ## RESUME HERE
 
@@ -80,9 +80,50 @@ the local `dist/v0.1.0/SHA256SUMS`. `release.yml` builds `omt` for four targets 
 - **M12 prerequisites** — `Sender::send_encoded_video` (pre-encoded VMX1; a libomtnet receiver decoded it to identical pixels), `SenderConfig::encoder_threads`, `SendError` instead of panics (**breaking:** `send_video`/`send_audio` return `Result<usize, SendError>`), sender/peer/receiver stats, one shared `Discovery` with interface selection (`DiscoveryConfig`), bounded `Drop` (2 s), and a `vmx_decode` fuzz target. It found `preview_len` miscounting an extended header with DC shift 0 — fixed, regression test in `decoder.rs`.
 Still only libomtnet on one Mac: **no vMix, OBS or Pi.**
 
-**Next step:** get reports from real products (`TESTING.md` §3) and record them in
-`docs/INTEROP.md`. Code gaps: redirect (§9), discovery server (§10), re-resolving a source
-by name after it moves port, 10-bit snapshots, a decoding receive API in the library.
+**Goal for the week of 23 Sep 2026 (maintainer's request):** everything that does not need real
+equipment is finished, so the maintainer's vMix / OBS / Raspberry Pi testing week is the only thing
+left. Windows CI fixed and merged 23 Sep (`3f84881`, `src/net.rs`: on Windows `shutdown()` does not
+wake a blocked read, so readers poll a stop flag every 100 ms; evidence `docs/evidence/2026-09-23-windows-ci`).
+
+**In flight on 23 Sep (branches; worktrees under the session scratchpad — if lost, re-create from the
+pushed branches):**
+- `fix/library` — bug-hunt + security fixes and small features. Bugs (each with a failing test in
+  the bug-hunt report): shared `Discovery` second browse deafens the first (mdns-sd overwrites the
+  listener); sender `start_peer` race leaks peers/tally on fast close; duplicate name on a shared
+  Discovery withdraws the other sender; discovery server writes under the table lock (one slow client
+  stalls all); unbounded receiver queue; discovery client writes without timeout; `redirect::parse`
+  and unparseable-redirect behaviour differ from libomtnet; redirect watchers start their own mDNS.
+  Security (PoCs on localhost): receiver queue 15 MB → 3 GB in 1.2 s; redirect to any host incl. DNS
+  (→ `RedirectPolicy`, default SameHost); discovery server hijack/flood/stall (→ only-remove-own,
+  caps, per-peer outbox); sender 500 idle sockets → 1,002 threads (→ connection/per-IP caps,
+  subscribe timeout, `bind`). Features: `settings.xml`, lenient tally parsing, D6 on Windows,
+  `log` facade, metadata helpers (OMTWeb/OMTPTZ/AncillaryData/OMTGroup), more fuzz targets,
+  `SECURITY.md` ("OMT is a trusted-LAN protocol").
+- `feat/tester-kit` — `omt send` every format/size/fps/alpha/audio, `omt recv` with live tally/
+  quality/preview, **`omt check`** (health of any OMT source: frames, fps, decode, freeze/black/
+  silence, A/V offset; OK/WARN/FAIL + exit codes, `--watch`, `--json`), `omt report` bundle,
+  `--verbose`, TESTING.md rewritten per product (step 0: `omt check --all`).
+- `feat/release-ci` — Linux aarch64 (Pi) + static musl binaries, SHA256SUMS in the workflow, CI on
+  `ubuntu-24.04-arm`, libvmx conformance actually running in CI (at `544bcfb` and upstream's new
+  `a1828cb`), fuzz smoke, libomtnet harness interop in CI on Linux and Windows.
+- `feat/interop-coverage` — harness sends/receives what OBS and the Pi tools use (NV12, YUY2, BGRA
+  premultiplied, interlaced, BT.601, 1080p59.94, mono/8/16/32 ch, 44.1/96 kHz), fills PROTOCOL.md
+  Live rows, X3/X4 against libomtnet.
+
+**After those merge:** opt-in encrypted transport `omts://` (TLS 1.3 via rustls, separate port,
+pinned certs, advertised in the unused mDNS TXT; plain OMT stays the default); version 0.2.0 +
+CHANGELOG (breaking: `send_video`/`send_audio` return `Result<usize, SendError>`); refresh stale docs
+(README says vmx-codec is safe-Rust; crate README module list; lib.rs Status; UPSTREAM "later";
+INTEROP rows for 23 Sep); new release for the testers.
+
+**Decided not to do (would break interop — upstream rejected them, libomtnet PRs #36-#40):** QUIC,
+AV1/Opus, PTP, multicast. **After testing week, candidates:** C ABI compatible with `libomt.h`
+(FFmpeg/Python/Unity), GStreamer `omtsrc`/`omtsink`, AVX2, `omt route` (router on redirect), a
+.NET-free Pi encoder/player, frame sync in Caudal.
+
+**Top risks for the testing week:** our SRV target `<host>-omt.local.` (libomtnet uses the OS host
+name) resolving from Windows/vMix and Linux+Avahi; Windows browse freshness (libomtnet re-queries
+PTR every 8 s); vMix quality/multichannel audio behaviour.
 
 ## House rules
 
