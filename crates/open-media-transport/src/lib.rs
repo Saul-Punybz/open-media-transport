@@ -50,6 +50,7 @@ pub mod clock;
 pub mod command;
 mod deframer;
 pub mod discovery;
+pub mod discovery_server;
 pub mod frame;
 pub mod receiver;
 pub mod sender;

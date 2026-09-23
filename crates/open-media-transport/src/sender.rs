@@ -85,8 +85,11 @@ pub struct SenderConfig {
     pub info: Option<SenderInfo>,
     /// Extra metadata strings sent to every receiver on connect.
     pub connection_metadata: Vec<Vec<u8>>,
-    /// Announce over DNS-SD.
+    /// Announce over DNS-SD, or to `discovery_server` if one is set.
     pub announce: bool,
+    /// Announce to this discovery server (`omt://host[:port]`) instead of
+    /// over DNS-SD, as libomtnet does when one is configured (S1).
+    pub discovery_server: Option<String>,
     /// Ports to try, in order.
     pub ports: RangeInclusive<u16>,
 }
@@ -100,6 +103,7 @@ impl SenderConfig {
             info: None,
             connection_metadata: Vec::new(),
             announce: true,
+            discovery_server: None,
             ports: DEFAULT_PORTS,
         }
     }
@@ -168,7 +172,11 @@ impl Sender {
         });
         // Announce before starting the accept thread, so a failure leaves nothing running.
         let (discovery, full_name) = if config.announce {
-            let d = Discovery::new().map_err(io::Error::other)?;
+            let d = match &config.discovery_server {
+                Some(url) => Discovery::with_server(url, false),
+                None => Discovery::new(),
+            }
+            .map_err(io::Error::other)?;
             let full = d.announce(&config.name, port).map_err(io::Error::other)?;
             (Some(d), Some(full))
         } else {
@@ -622,7 +630,7 @@ fn bind_first_free(ports: RangeInclusive<u16>) -> io::Result<(TcpListener, u16)>
 
 /// `[::]:port` with IPv6-only off, like libomtnet (T1); IPv4 only if the
 /// host has no IPv6.
-fn bind_dual_stack(port: u16) -> io::Result<TcpListener> {
+pub(crate) fn bind_dual_stack(port: u16) -> io::Result<TcpListener> {
     let v6 = (|| {
         let s = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP))?;
         s.set_only_v6(false)?;

@@ -15,6 +15,8 @@ the MIT license. Video uses the [`vmx-codec`](../vmx-codec) crate.
 - `receiver` — a minimal blocking receiver that connects the way libomtnet does
 - `sender` — listens, answers receivers' commands, encodes VMX1 with `vmx-codec`
 - `discovery` — announce and browse `_omt._tcp` over mDNS, with libomtnet's naming
+- `discovery_server` — the discovery server and its client, for networks without
+  multicast; `Discovery::with_server` uses one instead of mDNS for announcing
 
 Receiver, sender and discovery have each been run against libomtnet, with the
 same decoded pixels on both sides; see `docs/INTEROP.md` for exactly what was

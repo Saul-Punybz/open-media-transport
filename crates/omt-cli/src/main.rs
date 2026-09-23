@@ -4,10 +4,13 @@
 //! omt list [--seconds N]
 //! omt send [--name NAME] [--size WxH] [--fps F] [--seconds N]
 //! omt recv SOURCE [--seconds N] [--snapshot FILE.bmp] [--preview]
+//! omt discovery-server [--port N] [--seconds N]
 //! ```
 //!
 //! `SOURCE` is a name as `omt list` shows it, e.g. `"MY-PC (Camera 1)"`, or
-//! `host:port`.
+//! `host:port`. `list`, `send` and `recv` take `--discovery-server URL` to
+//! use a discovery server, and `list` and `recv` take `--no-mdns` to use
+//! nothing else.
 
 mod image;
 
@@ -20,6 +23,7 @@ use std::time::{Duration, Instant};
 use open_media_transport::clock::Clock;
 use open_media_transport::command::{classify, Message, Quality};
 use open_media_transport::discovery::{Discovery, SourceEvent};
+use open_media_transport::discovery_server::{self, Server, ServerEvent};
 use open_media_transport::frame::{ExtendedHeader, VideoFlags};
 use open_media_transport::receiver::{Event, Receiver, ReceiverConfig};
 use open_media_transport::sender::{Sender, SenderConfig, SenderInfo, VideoParams};
@@ -37,7 +41,14 @@ USAGE:
   omt recv SOURCE [--seconds N] [--snapshot FILE.bmp] [--preview]
       Connect to SOURCE (a name from `omt list`, or host:port), print
       statistics every second, and optionally save the last frame.
+  omt discovery-server [--port N] [--seconds N]
+      Run a discovery server for networks without multicast (default port
+      6399), printing each client and source as it comes and goes.
   omt version
+
+  list, send and recv also take --discovery-server omt://HOST[:PORT]: send
+  then registers with that server instead of announcing over mDNS; list and
+  recv ask the server as well as mDNS, or only the server with --no-mdns.
 ";
 
 fn main() -> ExitCode {
@@ -46,6 +57,7 @@ fn main() -> ExitCode {
         Some("list") => list(&args[1..]),
         Some("send") => send(&args[1..]),
         Some("recv") => recv(&args[1..]),
+        Some("discovery-server") => serve_discovery(&args[1..]),
         Some("version" | "--version" | "-V") => {
             println!("omt {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -80,9 +92,21 @@ fn seconds(args: &[String]) -> Result<Option<u64>> {
         .transpose()
 }
 
+/// mDNS, or the discovery server given with `--discovery-server`.
+fn discovery(args: &[String]) -> Result<Discovery> {
+    match opt(args, "--discovery-server") {
+        Some(url) => {
+            let mdns = !args.iter().any(|a| a == "--no-mdns");
+            Discovery::with_server(url, mdns)
+        }
+        None => Discovery::new(),
+    }
+    .map_err(|e| e.to_string())
+}
+
 fn list(args: &[String]) -> Result<()> {
     let secs = seconds(args)?.unwrap_or(5);
-    let d = Discovery::new().map_err(|e| e.to_string())?;
+    let d = discovery(args)?;
     let browser = d.browse().map_err(|e| e.to_string())?;
     let deadline = Instant::now() + Duration::from_secs(secs);
     let mut seen = std::collections::BTreeMap::new();
@@ -140,6 +164,7 @@ fn send(args: &[String]) -> Result<()> {
     let limit = seconds(args)?.map(Duration::from_secs);
 
     let mut config = SenderConfig::new(name);
+    config.discovery_server = opt(args, "--discovery-server").map(str::to_owned);
     config.info = Some(SenderInfo {
         product_name: "omt".into(),
         manufacturer: "open-media-transport".into(),
@@ -211,7 +236,7 @@ fn send(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-fn resolve(source: &str) -> Result<SocketAddr> {
+fn resolve(source: &str, args: &[String]) -> Result<SocketAddr> {
     if !source.contains('(') {
         return source
             .to_socket_addrs()
@@ -219,7 +244,7 @@ fn resolve(source: &str) -> Result<SocketAddr> {
             .next()
             .ok_or(format!("no address for {source}"));
     }
-    let d = Discovery::new().map_err(|e| e.to_string())?;
+    let d = discovery(args)?;
     let browser = d.browse().map_err(|e| e.to_string())?;
     let deadline = Instant::now() + Duration::from_secs(5);
     while let Some(left) = deadline.checked_duration_since(Instant::now()) {
@@ -252,7 +277,7 @@ fn recv(args: &[String]) -> Result<()> {
     let limit = seconds(args)?.map(Duration::from_secs);
     let snapshot = opt(args, "--snapshot");
     let preview = args.iter().any(|a| a == "--preview");
-    let addr = resolve(source)?;
+    let addr = resolve(source, args)?;
     println!("connecting to {source} at {addr}");
     let rx = Receiver::connect(
         addr,
@@ -409,6 +434,36 @@ fn recv(args: &[String]) -> Result<()> {
                 println!("saved {w}x{h} snapshot to {path}");
             }
             None => println!("no video frame decoded; no snapshot written"),
+        }
+    }
+    Ok(())
+}
+
+fn serve_discovery(args: &[String]) -> Result<()> {
+    let port = match opt(args, "--port") {
+        Some(p) => p.parse().map_err(|_| format!("bad --port {p}"))?,
+        None => discovery_server::DEFAULT_PORT,
+    };
+    let limit = seconds(args)?.map(Duration::from_secs);
+    let server = Server::bind(port).map_err(|e| format!("cannot listen on port {port}: {e}"))?;
+    println!(
+        "discovery server on port {}. Ctrl-C to stop.",
+        server.port()
+    );
+    let start = Instant::now();
+    while limit.map_or(true, |l| start.elapsed() < l) {
+        // Lines as libomtnet's server prints them (`server/OMTDiscoveryServer.cs:123,134,157,170`).
+        match server.recv_event(Duration::from_millis(200)) {
+            Some(ServerEvent::Connected(a)) => println!("Connected: {a}"),
+            Some(ServerEvent::Disconnected(a)) => println!("Disconnected: {a}"),
+            Some(ServerEvent::Added(a, m)) => {
+                println!(
+                    "{a} ADDED {} port {} {:?}",
+                    m.full_name, m.port, m.addresses
+                )
+            }
+            Some(ServerEvent::Removed(a, m)) => println!("{a} REMOVED {}", m.full_name),
+            None => {}
         }
     }
     Ok(())

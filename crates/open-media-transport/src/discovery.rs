@@ -6,11 +6,16 @@
 //! upper-cased (D2, D3), cut to 63 characters by shortening `Name` (D4), with
 //! an empty TXT record (D5). Loopback interfaces are not used, so loopback
 //! addresses are never advertised to the network.
+//!
+//! [`Discovery::with_server`] uses a discovery server instead (§10,
+//! [`crate::discovery_server`]).
 
 use std::net::IpAddr;
 use std::time::Duration;
 
 use mdns_sd::{IfKind, ServiceDaemon, ServiceEvent, ServiceInfo};
+
+use crate::discovery_server::Client;
 
 /// The DNS-SD service type, with domain (D1).
 pub const SERVICE_TYPE: &str = "_omt._tcp.local.";
@@ -90,31 +95,58 @@ pub enum SourceEvent {
     Removed(String),
 }
 
-/// The mDNS responder, shared by announcements and browsing.
+/// Announcements and browsing: the mDNS responder, a discovery server, or
+/// both.
 pub struct Discovery {
-    daemon: ServiceDaemon,
+    daemon: Option<ServiceDaemon>,
+    server: Option<Client>,
 }
 
 impl Discovery {
     /// Starts the responder on every non-loopback interface.
     pub fn new() -> Result<Self, Error> {
-        let daemon = ServiceDaemon::new()?;
-        // mdns-sd's loopback kinds match 127/8 and ::1 only; the loopback
-        // interface's link-local fe80::1 (macOS lo0) would still be announced
-        // to the network, so the interfaces are also excluded by name.
-        daemon.disable_interface(vec![
-            IfKind::LoopbackV4,
-            IfKind::LoopbackV6,
-            IfKind::Name("lo0".into()),
-            IfKind::Name("lo".into()),
-        ])?;
-        Ok(Discovery { daemon })
+        Ok(Discovery {
+            daemon: Some(start_daemon()?),
+            server: None,
+        })
+    }
+
+    /// Uses the discovery server at `url` (`omt://host[:port]`, port 6399 by
+    /// default). As in libomtnet when `settings.xml` names a server (S1),
+    /// sources are announced to the server only, never over DNS-SD
+    /// (`OMTDiscovery.cs:332-360`). Browsing reports what the server sends
+    /// and, if `browse_mdns` is set, what DNS-SD finds too; libomtnet does
+    /// both (`OMTDiscovery.cs:50-66`, `mac/OMTDiscoveryDnsSd.cs:172-176`).
+    /// The connection is made in the background and remade if it drops.
+    pub fn with_server(url: &str, browse_mdns: bool) -> Result<Self, Error> {
+        let server = Client::connect(url).map_err(|e| Error::Msg(e.to_string()))?;
+        let daemon = if browse_mdns {
+            Some(start_daemon()?)
+        } else {
+            None
+        };
+        Ok(Discovery {
+            daemon,
+            server: Some(server),
+        })
+    }
+
+    /// The discovery server client, if one is in use.
+    pub fn server(&self) -> Option<&Client> {
+        self.server.as_ref()
     }
 
     /// Announces a source called `name` on `port` and returns its full name.
     /// It stays announced until [`Discovery::withdraw`] or drop.
     pub fn announce(&self, name: &str, port: u16) -> Result<String, Error> {
         let full = full_name(&machine_name(), name);
+        if let Some(server) = &self.server {
+            server.register(&full, port);
+            return Ok(full);
+        }
+        let Some(daemon) = &self.daemon else {
+            return Err(Error::Msg("no discovery method".into()));
+        };
         let host = srv_host(&os_host_name());
         let info = ServiceInfo::new(
             SERVICE_TYPE,
@@ -125,14 +157,21 @@ impl Discovery {
             None::<std::collections::HashMap<String, String>>,
         )?
         .enable_addr_auto();
-        self.daemon.register(info)?;
+        daemon.register(info)?;
         Ok(full)
     }
 
     /// Withdraws a source announced with [`Discovery::announce`].
     pub fn withdraw(&self, full_name: &str) -> Result<(), Error> {
+        if let Some(server) = &self.server {
+            server.deregister(full_name);
+            return Ok(());
+        }
+        let Some(daemon) = &self.daemon else {
+            return Ok(());
+        };
         let fullname = format!("{}.{SERVICE_TYPE}", escape_instance(full_name));
-        let status = self.daemon.unregister(&fullname)?;
+        let status = daemon.unregister(&fullname)?;
         let _ = status.recv_timeout(Duration::from_secs(1));
         Ok(())
     }
@@ -140,33 +179,79 @@ impl Discovery {
     /// Starts browsing for sources.
     pub fn browse(&self) -> Result<Browser, Error> {
         Ok(Browser {
-            events: self.daemon.browse(SERVICE_TYPE)?,
+            events: match &self.daemon {
+                Some(d) => Some(d.browse(SERVICE_TYPE)?),
+                None => None,
+            },
+            server: self.server.as_ref().map(Client::subscribe),
         })
     }
+}
+
+fn start_daemon() -> Result<ServiceDaemon, Error> {
+    let daemon = ServiceDaemon::new()?;
+    // mdns-sd's loopback kinds match 127/8 and ::1 only; the loopback
+    // interface's link-local fe80::1 (macOS lo0) would still be announced
+    // to the network, so the interfaces are also excluded by name.
+    daemon.disable_interface(vec![
+        IfKind::LoopbackV4,
+        IfKind::LoopbackV6,
+        IfKind::Name("lo0".into()),
+        IfKind::Name("lo".into()),
+    ])?;
+    Ok(daemon)
 }
 
 impl Drop for Discovery {
     fn drop(&mut self) {
         // Sends goodbyes for announced services and stops the daemon thread.
-        if let Ok(done) = self.daemon.shutdown() {
-            let _ = done.recv_timeout(Duration::from_secs(1));
+        if let Some(daemon) = &self.daemon {
+            if let Ok(done) = daemon.shutdown() {
+                let _ = done.recv_timeout(Duration::from_secs(1));
+            }
         }
     }
 }
 
-/// A running browse for `_omt._tcp`.
+/// A running browse for `_omt._tcp`, and/or a discovery server's reports.
 pub struct Browser {
-    events: mdns_sd::Receiver<ServiceEvent>,
+    events: Option<mdns_sd::Receiver<ServiceEvent>>,
+    server: Option<flume::Receiver<SourceEvent>>,
+}
+
+enum Either {
+    Mdns(ServiceEvent),
+    Server(SourceEvent),
 }
 
 impl Browser {
     /// Waits up to `timeout` for the next change. Instances without `(` and
     /// `)` in their name are skipped, as libomtnet skips them (D7).
+    ///
+    /// With a discovery server, a source can be reported by both the server
+    /// and DNS-SD; libomtnet merges them into one entry by full name
+    /// (`OMTDiscovery.cs:193-247`), and so should the caller.
     pub fn recv_timeout(&self, timeout: Duration) -> Option<SourceEvent> {
         let deadline = std::time::Instant::now() + timeout;
         loop {
             let left = deadline.checked_duration_since(std::time::Instant::now())?;
-            let event = self.events.recv_timeout(left).ok()?;
+            let event = match (&self.events, &self.server) {
+                (Some(m), Some(s)) => flume::Selector::new()
+                    .recv(m, |r| r.ok().map(Either::Mdns))
+                    .recv(s, |r| r.ok().map(Either::Server))
+                    .wait_timeout(left)
+                    .ok()??,
+                (Some(m), None) => Either::Mdns(m.recv_timeout(left).ok()?),
+                (None, Some(s)) => Either::Server(s.recv_timeout(left).ok()?),
+                (None, None) => {
+                    std::thread::sleep(left);
+                    return None;
+                }
+            };
+            let event = match event {
+                Either::Server(e) => return Some(e),
+                Either::Mdns(e) => e,
+            };
             let mapped = match event {
                 ServiceEvent::ServiceResolved(s) => {
                     let full_name = instance_name(&s.fullname);
@@ -209,7 +294,7 @@ fn is_ipv6_link_local(a: &IpAddr) -> bool {
     matches!(a, IpAddr::V6(v6) if (v6.segments()[0] & 0xffc0) == 0xfe80)
 }
 
-fn address_preference(a: &IpAddr) -> (u8, bool, IpAddr) {
+pub(crate) fn address_preference(a: &IpAddr) -> (u8, bool, IpAddr) {
     let class = match a {
         _ if a.is_loopback() => 2,
         IpAddr::V4(v4) if v4.is_link_local() => 1,
