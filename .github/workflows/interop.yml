@@ -1,0 +1,107 @@
+name: Interop and fuzz
+
+# Slower checks kept out of ci.yml:
+# - interop: `omt` against upstream libomtnet (C#, the protocol's reference
+#   implementation) in both directions, on Linux x86_64, Linux arm64 and
+#   Windows x86_64, over loopback. No hardware needed.
+# - fuzz: a 60-second libFuzzer smoke run of each fuzz target.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Pinned in docs/UPSTREAM.md.
+  LIBOMTNET_COMMIT: 029ef4e925c68973f3289eb0c7ecfd40a161166f
+  LIBVMX_COMMIT: 544bcfb
+
+jobs:
+  interop:
+    name: interop (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Fetch libomtnet and libvmx
+        run: |
+          git clone -q https://github.com/openmediatransport/libomtnet reference/libomtnet
+          git -C reference/libomtnet checkout -q "$LIBOMTNET_COMMIT"
+          git clone -q https://github.com/openmediatransport/libvmx reference/libvmx
+          git -C reference/libvmx checkout -q "$LIBVMX_COMMIT"
+      # libomtnet P/Invokes "libvmx" (OMTVMX1Codec.cs:81) for video. Built
+      # with the flags of upstream's own scripts in libvmx/build/.
+      - name: Build libvmx (shared)
+        run: |
+          mkdir -p out
+          src=reference/libvmx/src
+          case "${{ runner.os }}-${{ runner.arch }}" in
+            Linux-X64)   clang++ -O3 -std=c++17 -fdeclspec -fPIC -Wno-c++11-narrowing -mlzcnt -mavx2 -mbmi -shared \
+                           $src/vmxcodec_x86.cpp $src/vmxcodec_avx2.cpp $src/vmxcodec.cpp -o out/libvmx.so ;;
+            Linux-ARM64) clang++ -O3 -std=c++17 -fdeclspec -fPIC -Wno-c++11-narrowing -shared \
+                           $src/vmxcodec_arm.cpp $src/vmxcodec.cpp -o out/libvmx.so ;;
+            Windows-X64) clang++ -O3 -std=c++17 -fdeclspec -Wno-c++11-narrowing -mlzcnt -mavx2 -mbmi -shared \
+                           -Wl,/DEF:reference/libvmx/exports.def \
+                           $src/vmxcodec_x86.cpp $src/vmxcodec_avx2.cpp $src/vmxcodec.cpp -o out/libvmx.dll ;;
+          esac
+          ls -l out
+      - name: Build libomtnet harness
+        run: |
+          dotnet build interop/libomtnet-harness -c Release -o out/harness -nologo -v q
+          cp out/libvmx.* out/harness/
+          dotnet build-server shutdown
+      - name: Build omt
+        run: cargo build --release -p omt-cli
+      - name: Run
+        run: |
+          bin=target/release/omt; [ "${{ runner.os }}" = Windows ] && bin=target/release/omt.exe
+          .github/scripts/interop.sh "$bin" out/harness/libomtnet-harness.dll "logs/${{ matrix.os }}"
+      - name: Summary
+        if: always()
+        run: |
+          { echo "### interop on ${{ matrix.os }}"; cat "logs/${{ matrix.os }}/summary.md" 2>/dev/null || echo "no summary"; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: interop-logs-${{ matrix.os }}
+          path: logs/
+
+  fuzz:
+    name: fuzz (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [deframer, metadata, vmx_decode]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/open-media-transport/fuzz
+      - name: Fuzz ${{ matrix.target }} for 60 s
+        working-directory: crates/open-media-transport
+        shell: bash
+        run: cargo fuzz run ${{ matrix.target }} -- -max_total_time=60 2>&1 | tail -25
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: crates/open-media-transport/fuzz/artifacts/

@@ -1,42 +1,128 @@
 name: Release
 
-# Builds the `omt` tool for each platform and attaches it to a GitHub release.
-# Runs only when a tag like v0.1.0 is pushed.
+# Builds the `omt` tool for each platform.
+# - A pushed tag like v0.1.0 attaches the archives and SHA256SUMS to a
+#   **draft** GitHub release.
+# - Run by hand (workflow_dispatch), it is a dry run: the same builds and
+#   smoke tests, archives uploaded as workflow artifacts, no release.
+#   Pull requests that change this file get the same dry run.
 on:
   push:
     tags: ["v*"]
+  pull_request:
+    paths: [".github/workflows/release.yml"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   build:
+    name: build (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-latest, target: aarch64-apple-darwin, ext: "" }
-          - { os: macos-latest, target: x86_64-apple-darwin, ext: "" }
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, ext: "" }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, ext: ".exe" }
+          # Linux binaries are static (musl), so they run on any glibc or none:
+          # Raspberry Pi OS bookworm (Debian 12), older distributions, Alpine.
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl }
+          # Built and run natively on arm64 (Raspberry Pi 5, 64-bit Pi OS).
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
+          # 32-bit Raspberry Pi OS (Pi 2 and later); cross-built, run under QEMU.
+          - { os: ubuntu-latest, target: armv7-unknown-linux-musleabihf, linker: arm-linux-gnueabihf-gcc, apt: gcc-arm-linux-gnueabihf qemu-user, run: qemu-arm }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          # Cross-built on the arm64 runner; smoke-tested under Rosetta when present.
+          - { os: macos-latest, target: x86_64-apple-darwin, run: arch -x86_64 }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, ext: .exe }
+          - { os: windows-11-arm, target: aarch64-pc-windows-msvc, ext: .exe }
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Oldest macOS each arch supports with current Rust.
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target == 'aarch64-apple-darwin' && '11.0' || '10.12' }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - run: cargo build --release -p omt-cli --target ${{ matrix.target }}
-      - name: Package
-        shell: bash
+      - name: Install cross tools
+        if: matrix.apt
+        run: sudo apt-get update -q && sudo apt-get install -yq ${{ matrix.apt }}
+      - name: Build
         run: |
-          name=omt-${{ github.ref_name }}-${{ matrix.target }}
+          if [ -n "${{ matrix.linker }}" ]; then
+            t=$(echo "${{ matrix.target }}" | tr 'a-z-' 'A-Z_')
+            export "CARGO_TARGET_${t}_LINKER=${{ matrix.linker }}"
+          fi
+          # Windows: link the C runtime statically, so no Visual C++
+          # Redistributable is needed on the machine running vMix or OBS.
+          case "${{ matrix.target }}" in *windows-msvc) export RUSTFLAGS="-C target-feature=+crt-static";; esac
+          cargo build --release --locked -p omt-cli --target ${{ matrix.target }}
+      - name: Smoke test
+        run: |
+          bin="target/${{ matrix.target }}/release/omt${{ matrix.ext }}"
+          file "$bin" || true
+          case "${{ matrix.target }}" in
+            *linux*) if file "$bin" | grep -q "dynamically linked"; then echo "::error::not static"; exit 1; fi;;
+            *windows*) if command -v dumpbin >/dev/null; then dumpbin //dependents "$bin"; fi;;
+            *darwin*) otool -L "$bin"; otool -l "$bin" | grep -A4 -E "LC_BUILD_VERSION|LC_VERSION_MIN" | grep -E "minos|version" || true;;
+          esac
+          if [ "${{ matrix.target }}" = x86_64-apple-darwin ] && ! arch -x86_64 /usr/bin/true 2>/dev/null; then
+            echo "::warning::no Rosetta on this runner; x86_64 macOS binary built but not run"
+            exit 0
+          fi
+          ${{ matrix.run }} "$bin" --version
+          # With no arguments omt prints its usage and exits 2.
+          set +e; ${{ matrix.run }} "$bin" > usage.txt 2>&1; code=$?; set -e
+          head -3 usage.txt
+          [ "$code" = 2 ] && grep -q "USAGE:" usage.txt
+      - name: Package
+        id: package
+        run: |
+          if [ "${{ github.ref_type }}" = tag ]; then v="${{ github.ref_name }}"; else v="dev-${GITHUB_SHA::7}"; fi
+          name="omt-$v-${{ matrix.target }}"
           mkdir "$name"
           cp "target/${{ matrix.target }}/release/omt${{ matrix.ext }}" "$name/"
           cp LICENSE-MIT LICENSE-APACHE NOTICE TESTING.md "$name/"
-          if [ "${{ matrix.ext }}" = ".exe" ]; then 7z a "$name.zip" "$name"; else tar czf "$name.tar.gz" "$name"; fi
-      - uses: softprops/action-gh-release@v2
+          if [ -n "${{ matrix.ext }}" ]; then 7z a -bso0 "$name.zip" "$name"; else tar czf "$name.tar.gz" "$name"; fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: ${{ steps.package.outputs.name }}
+          path: |
             omt-*.tar.gz
             omt-*.zip
+          if-no-files-found: error
+
+  # Collects every archive, writes SHA256SUMS, and on a tag makes the draft
+  # release. On a dry run the archives and SHA256SUMS stay workflow artifacts.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum omt-* > SHA256SUMS
+          cat SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        if: github.ref_type != 'tag'
+        with:
+          name: SHA256SUMS
+          path: dist/SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: |
+            dist/omt-*
+            dist/SHA256SUMS
           draft: true
