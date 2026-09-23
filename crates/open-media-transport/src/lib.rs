@@ -53,6 +53,7 @@ mod deframer;
 pub mod discovery;
 pub mod discovery_server;
 pub mod frame;
+pub mod media;
 pub mod receiver;
 pub mod redirect;
 pub mod sender;

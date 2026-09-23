@@ -86,6 +86,11 @@ mod ffi {
         pub fn VMX_DecodeP216(i: *mut VmxInstance, dst: *mut u8, stride: c_int) -> c_int;
         pub fn VMX_DecodePA16(i: *mut VmxInstance, dst: *mut u8, stride: c_int) -> c_int;
         pub fn VMX_DecodePreviewUYVY(i: *mut VmxInstance, dst: *mut u8, stride: c_int) -> c_int;
+        pub fn VMX_DecodeBGRA(i: *mut VmxInstance, dst: *mut u8, stride: c_int) -> c_int;
+        pub fn VMX_DecodeBGRX(i: *mut VmxInstance, dst: *mut u8, stride: c_int) -> c_int;
+        pub fn VMX_DecodePreviewUYVA(i: *mut VmxInstance, dst: *mut u8, stride: c_int) -> c_int;
+        pub fn VMX_DecodePreviewBGRA(i: *mut VmxInstance, dst: *mut u8, stride: c_int) -> c_int;
+        pub fn VMX_DecodePreviewBGRX(i: *mut VmxInstance, dst: *mut u8, stride: c_int) -> c_int;
         pub fn vmxref_set_avx2(i: *mut VmxInstance, enabled: c_int);
         pub fn vmxref_set_threads(i: *mut VmxInstance, n: c_int);
         pub fn vmxref_destroy(i: *mut VmxInstance);
@@ -119,11 +124,24 @@ impl RefCodec {
     /// Creates an instance. `simd256` enables the AVX2 path where available;
     /// with `false` the 128-bit (SSE / NEON-via-sse2neon) path is used.
     pub fn new(width: usize, height: usize, profile: i32, threads: i32, simd256: bool) -> Option<Self> {
+        Self::with_color_space(width, height, profile, threads, simd256, 0)
+    }
+
+    /// As [`RefCodec::new`], with a `VMX_COLORSPACE` (0, 601 or 709), which
+    /// picks the YUV/RGB matrix of the BGRA functions.
+    pub fn with_color_space(
+        width: usize,
+        height: usize,
+        profile: i32,
+        threads: i32,
+        simd256: bool,
+        color_space: i32,
+    ) -> Option<Self> {
         let inst = unsafe {
             ffi::VMX_Create(
                 ffi::VmxSize { width: width as i32, height: height as i32 },
                 profile,
-                0,
+                color_space,
             )
         };
         if inst.is_null() {
@@ -268,6 +286,65 @@ impl RefCodec {
         }
         Ok((out, pw, ph))
     }
+
+    fn load(&mut self, data: &[u8]) -> Result<(), i32> {
+        let mut copy = data.to_vec();
+        match unsafe { ffi::VMX_LoadFrom(self.inst, copy.as_mut_ptr(), copy.len() as i32) } {
+            0 => Ok(()),
+            e => Err(e),
+        }
+    }
+
+    /// Decodes to packed BGRA (`alpha`) or BGRX (alpha 255), stride `4w`.
+    pub fn decode_bgra(&mut self, data: &[u8], alpha: bool) -> Result<Vec<u8>, i32> {
+        self.load(data)?;
+        let mut out = vec![0u8; self.width * 4 * self.height];
+        let (p, stride) = (out.as_mut_ptr(), (self.width * 4) as i32);
+        let err = unsafe {
+            if alpha {
+                ffi::VMX_DecodeBGRA(self.inst, p, stride)
+            } else {
+                ffi::VMX_DecodeBGRX(self.inst, p, stride)
+            }
+        };
+        if err != 0 {
+            return Err(err);
+        }
+        Ok(out)
+    }
+
+    /// Decodes the progressive preview as UYVA (UYVY then alpha) or as BGRA
+    /// / BGRX, like libomtnet's receiver (`OMTReceive.cs:797-836`).
+    pub fn decode_preview_as(&mut self, data: &[u8], fmt: RefPreview) -> Result<(Vec<u8>, usize, usize), i32> {
+        self.load(data)?;
+        let pw = (self.width >> 3) + ((self.width >> 3) & 1);
+        let ph = self.height >> 3;
+        let (bytes, stride) = match fmt {
+            RefPreview::Uyva => (pw * 3 * ph, pw * 2),
+            RefPreview::Bgra | RefPreview::Bgrx => (pw * 4 * ph, pw * 4),
+        };
+        let mut out = vec![0u8; bytes];
+        let (p, s) = (out.as_mut_ptr(), stride as i32);
+        let err = unsafe {
+            match fmt {
+                RefPreview::Uyva => ffi::VMX_DecodePreviewUYVA(self.inst, p, s),
+                RefPreview::Bgra => ffi::VMX_DecodePreviewBGRA(self.inst, p, s),
+                RefPreview::Bgrx => ffi::VMX_DecodePreviewBGRX(self.inst, p, s),
+            }
+        };
+        if err != 0 {
+            return Err(err);
+        }
+        Ok((out, pw, ph))
+    }
+}
+
+/// Preview layouts for [`RefCodec::decode_preview_as`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RefPreview {
+    Uyva,
+    Bgra,
+    Bgrx,
 }
 
 #[cfg(not(libvmx_missing))]
@@ -317,6 +394,15 @@ impl RefCodec {
         unreachable!("libvmx reference not built")
     }
     pub fn decode_preview_uyvy(&mut self, data: &[u8]) -> Result<(Vec<u8>, usize, usize), i32> {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn with_color_space(_w: usize, _h: usize, _p: i32, _t: i32, _s: bool, _c: i32) -> Option<Self> {
+        None
+    }
+    pub fn decode_bgra(&mut self, data: &[u8], alpha: bool) -> Result<Vec<u8>, i32> {
+        unreachable!("libvmx reference not built")
+    }
+    pub fn decode_preview_as(&mut self, data: &[u8], fmt: RefPreview) -> Result<(Vec<u8>, usize, usize), i32> {
         unreachable!("libvmx reference not built")
     }
 }
