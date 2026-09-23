@@ -16,7 +16,7 @@
 //!
 //! Both streams are padded with zero bits to a byte boundary after each plane.
 
-use crate::bits::{from_code, to_code, AcSymbol, BitReader, BitWriter, Corrupt};
+use crate::bits::{from_code, to_code, AcCursor, AcSymbol, BitReader, BitWriter, Corrupt};
 use crate::dct::{broadcast_dc8, fdct_quant_zig, idct16, idct8, Depth};
 use crate::lanes::Isa;
 use crate::tables::ZIGZAG;
@@ -128,9 +128,11 @@ pub(crate) fn decode_plane<T: Sample + DecodeOut, S: Isa>(
     shift: i16,
     matrix: &[u16; 64],
     dc_shift: u32,
-    dc: &mut BitReader,
-    ac: &mut BitReader,
+    dc_in: &mut BitReader,
+    ac_in: &mut BitReader,
 ) -> Result<(), Corrupt> {
+    // Local copies keep the read state in registers.
+    let (mut dc, mut ac) = (*dc_in, AcCursor::new(*ac_in));
     let mut dc_pred: i16 = 0;
     let mut pending: u64 = 0;
     for by in 0..2 {
@@ -162,8 +164,10 @@ pub(crate) fn decode_plane<T: Sample + DecodeOut, S: Isa>(
             T::write_block::<S>(&block, has_ac, matrix, &mut rows[base + bx..], stride, shift);
         }
     }
+    let mut ac = ac.reader();
     ac.align();
     dc.align();
+    (*dc_in, *ac_in) = (dc, ac);
     Ok(())
 }
 

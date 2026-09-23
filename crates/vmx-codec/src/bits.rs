@@ -206,6 +206,93 @@ pub(crate) enum AcSymbol {
     Value(u64),
 }
 
+/// A [`BitReader`] with the next bits cached in a register, for the AC
+/// symbol loop: most symbols then decode without a load on the dependency
+/// chain. `bits` holds `count` valid bits MSB-first (zeros below them);
+/// `next` is the next byte to load, so the stream position is
+/// `8 * next - count`.
+#[derive(Clone, Copy)]
+pub(crate) struct AcCursor<'a> {
+    data: &'a [u8],
+    next: usize,
+    bits: u64,
+    count: u32,
+}
+
+impl<'a> AcCursor<'a> {
+    pub(crate) fn new(r: BitReader<'a>) -> Self {
+        let mut c = Self { data: r.data, next: r.pos >> 3, bits: 0, count: 0 };
+        c.refill();
+        let skip = (r.pos & 7) as u32;
+        c.bits <<= skip;
+        c.count -= skip;
+        c
+    }
+
+    /// Back to a plain reader at the same position.
+    pub(crate) fn reader(&self) -> BitReader<'a> {
+        BitReader { data: self.data, pos: 8 * self.next - self.count as usize }
+    }
+
+    /// Tops the cache up to 57..=63 bits (past the end: `1` bits, as
+    /// [`BitReader`] reads them).
+    #[inline(always)]
+    fn refill(&mut self) {
+        let w = match self.data.get(self.next..self.next + 8) {
+            Some(b) => u64::from_be_bytes(b.try_into().expect("8 bytes")),
+            None => BitReader::peek_tail(self.data, self.next),
+        };
+        self.bits |= w >> self.count;
+        let bytes = (63 - self.count) / 8;
+        self.next += bytes as usize;
+        self.count += 8 * bytes;
+    }
+
+    #[inline(always)]
+    fn consume(&mut self, n: u32) {
+        self.bits <<= n;
+        self.count -= n;
+    }
+
+    /// Reads one symbol of the AC stream: a run code (`1` prefix) or a
+    /// value code (`0` prefix). Same result and position as reading it with
+    /// [`BitReader::bit`] and [`BitReader::code_tail`].
+    #[inline(always)]
+    pub(crate) fn ac_symbol(&mut self) -> Result<AcSymbol, Corrupt> {
+        if self.count < 32 {
+            self.refill();
+        }
+        // At least 32 valid bits: enough for any code of up to 2 + z + (z + 2)
+        // bits with z <= 14 (coefficients below 2^16).
+        let w = self.bits;
+        if w >> 62 == 0b11 {
+            self.consume(2);
+            return Ok(AcSymbol::Run(1));
+        }
+        let run = w >> 63;
+        let head = 1 + run as u32; // `0` or `10`
+        let z = (w << head).leading_zeros();
+        if z > 14 {
+            return self.ac_symbol_slow(head, run == 1);
+        }
+        let n = z + 2;
+        let v = (w << (head + z)) >> (64 - n);
+        self.consume(head + z + n);
+        Ok(if run == 1 { AcSymbol::Run(v) } else { AcSymbol::Value(v) })
+    }
+
+    /// Long or corrupt code: the bit-by-bit path, errors included.
+    #[cold]
+    #[inline(never)]
+    fn ac_symbol_slow(&mut self, head: u32, run: bool) -> Result<AcSymbol, Corrupt> {
+        let mut r = self.reader();
+        r.pos += head as usize;
+        let v = r.code_tail()?;
+        *self = Self::new(r);
+        Ok(if run { AcSymbol::Run(v) } else { AcSymbol::Value(v) })
+    }
+}
+
 /// Error raised when a bitstream is malformed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Corrupt;
@@ -213,6 +300,7 @@ pub(crate) struct Corrupt;
 /// MSB-first bit reader over one slice stream. Reads past the end return
 /// `1` bits, like the `0xFF` guard bytes libvmx places after each stream, so
 /// truncated input terminates quickly instead of looping.
+#[derive(Clone, Copy)]
 pub(crate) struct BitReader<'a> {
     data: &'a [u8],
     /// Absolute bit position.
@@ -228,14 +316,23 @@ impl<'a> BitReader<'a> {
     #[inline(always)]
     fn peek64(&self) -> u64 {
         let byte = self.pos >> 3;
+        let w = match self.data.get(byte..byte + 8) {
+            Some(b) => u64::from_be_bytes(b.try_into().expect("8 bytes")),
+            None => Self::peek_tail(self.data, byte),
+        };
+        w << (self.pos & 7)
+    }
+
+    /// The last bytes of the stream, padded with `0xFF`.
+    #[cold]
+    #[inline(never)]
+    fn peek_tail(data: &[u8], byte: usize) -> u64 {
         let mut w = [0xFFu8; 8];
-        if byte + 8 <= self.data.len() {
-            w.copy_from_slice(&self.data[byte..byte + 8]);
-        } else if byte < self.data.len() {
-            let n = self.data.len() - byte;
-            w[..n].copy_from_slice(&self.data[byte..]);
+        if byte < data.len() {
+            let n = data.len() - byte;
+            w[..n].copy_from_slice(&data[byte..]);
         }
-        u64::from_be_bytes(w) << (self.pos & 7)
+        u64::from_be_bytes(w)
     }
 
     #[inline(always)]
@@ -278,34 +375,6 @@ impl<'a> BitReader<'a> {
             return Err(Corrupt);
         }
         Ok(self.bits(n))
-    }
-
-    /// Reads one symbol of the AC stream: a run code (`1` prefix) or a value
-    /// code (`0` prefix). Same result and position as reading it with
-    /// [`bit`](Self::bit) and [`code_tail`](Self::code_tail), but from a
-    /// single 64-bit peek whenever the whole code is inside it.
-    #[inline(always)]
-    pub(crate) fn ac_symbol(&mut self) -> Result<AcSymbol, Corrupt> {
-        // A peek holds at least 57 valid bits. The longest code handled here
-        // is 2 + z + (z + 2) bits with z <= 26.
-        let w = self.peek64();
-        if w >> 62 == 0b11 {
-            self.pos += 2;
-            return Ok(AcSymbol::Run(1));
-        }
-        let run = w >> 63;
-        let head = 1 + run as u32; // `0` or `10`
-        let z = (w << head).leading_zeros();
-        if z <= 26 {
-            let n = z + 2;
-            let v = (w << (head + z)) >> (64 - n);
-            self.pos += (head + z + n) as usize;
-            return Ok(if run == 1 { AcSymbol::Run(v) } else { AcSymbol::Value(v) });
-        }
-        // Long or corrupt code: the bit-by-bit path, errors included.
-        self.pos += head as usize;
-        let v = self.code_tail()?;
-        Ok(if run == 1 { AcSymbol::Run(v) } else { AcSymbol::Value(v) })
     }
 
     /// Skips to the next byte boundary.
@@ -404,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    fn ac_symbol_matches_bitwise_reader() {
+    fn ac_cursor_matches_bitwise_reader() {
         let mut seed = 0xA5A5_5A5A_1234_4321u64;
         let mut rnd = || {
             seed ^= seed << 13;
@@ -429,14 +498,17 @@ mod tests {
             };
             let cut = if data.is_empty() { 0 } else { (rnd() as usize) % (data.len() + 1) };
             let data = if case % 2 == 0 { &data[..] } else { &data[..cut] };
-            let (mut a, mut b) = (BitReader::new(data), BitReader::new(data));
+            // Start at every bit offset of the first byte.
+            let mut b = BitReader::new(data);
+            b.pos = case % 8;
+            let mut a = AcCursor::new(b);
             for _ in 0..2000 {
                 let (x, y) = (a.ac_symbol(), ac_symbol_bitwise(&mut b));
                 assert_eq!(x, y, "case {case}");
                 if x.is_err() {
                     break;
                 }
-                assert_eq!(a.pos, b.pos, "case {case}");
+                assert_eq!(a.reader().pos, b.pos, "case {case}");
             }
         }
     }
