@@ -257,17 +257,14 @@ fn idct_row<S: Isa>(a: S::V16, tab: &[i16; 32], round: S::V32, shift: u32) -> S:
     S::packs32(lo, S::shuffle32::<0x1b>(hi))
 }
 
-/// Dequantisation + inverse DCT of one block given in zig-zag order. Returns
-/// the eight output rows (level shift applied, not yet clamped).
-fn idct_core<S: Isa>(zz: &[i16; 64], depth: Depth, matrix: &[u16; 64], add: i16) -> [S::V16; 8] {
+/// Dequantisation + inverse DCT of one block given in natural order (the
+/// decoder de-zig-zags while reading coefficients). Returns the eight output
+/// rows (level shift applied, not yet clamped).
+fn idct_core<S: Isa>(nat: &[i16; 64], depth: Depth, matrix: &[u16; 64], add: i16) -> [S::V16; 8] {
     let (deq_shift, row_round, row_shift, col_round, col_corr, col_shift) = match depth {
         Depth::Eight => (4, 1024, 11, 32i16, 31i16, 6),
         Depth::Ten => (2, 2048, 12, 16i16, 15i16, 5),
     };
-    let mut nat = [0i16; 64];
-    for (i, &z) in zz.iter().enumerate() {
-        nat[ZIGZAG[i]] = z;
-    }
     let a: [S::V16; 8] = core::array::from_fn(|k| {
         let o = k * 8;
         S::srai16(S::mullo(S::load(a8(&nat[o..o + 8])), S::load_u(a8(&matrix[o..o + 8]))), deq_shift)
@@ -378,19 +375,19 @@ fn idct_core<S: Isa>(zz: &[i16; 64], depth: Depth, matrix: &[u16; 64], add: i16)
     [out0, out1, out2, out3, out4, out5, out6, out7]
 }
 
-/// Dequantise + inverse DCT, writing 8-bit samples to `dst` (row stride
-/// `stride` bytes).
-pub(crate) fn idct8<S: Isa>(zz: &[i16; 64], matrix: &[u16; 64], dst: &mut [u8], stride: usize, add: i16) {
-    let rows = idct_core::<S>(zz, Depth::Eight, matrix, add);
+/// Dequantise + inverse DCT of a natural-order block, writing 8-bit samples
+/// to `dst` (row stride `stride` bytes).
+pub(crate) fn idct8<S: Isa>(nat: &[i16; 64], matrix: &[u16; 64], dst: &mut [u8], stride: usize, add: i16) {
+    let rows = idct_core::<S>(nat, Depth::Eight, matrix, add);
     for (k, row) in rows.iter().enumerate() {
         dst[k * stride..k * stride + 8].copy_from_slice(&S::packus8(*row));
     }
 }
 
-/// Dequantise + inverse DCT, writing 16-bit samples (10 significant bits,
-/// MSB-aligned) to `dst` (row stride `stride` samples).
-pub(crate) fn idct16<S: Isa>(zz: &[i16; 64], matrix: &[u16; 64], dst: &mut [u16], stride: usize, add: i16) {
-    let rows = idct_core::<S>(zz, Depth::Ten, matrix, add);
+/// Dequantise + inverse DCT of a natural-order block, writing 16-bit samples
+/// (10 significant bits, MSB-aligned) to `dst` (row stride `stride` samples).
+pub(crate) fn idct16<S: Isa>(nat: &[i16; 64], matrix: &[u16; 64], dst: &mut [u16], stride: usize, add: i16) {
+    let rows = idct_core::<S>(nat, Depth::Ten, matrix, add);
     let hi = S::splat(1023);
     let lo = S::splat(0);
     for (k, row) in rows.iter().enumerate() {
@@ -404,9 +401,9 @@ pub(crate) fn idct16<S: Isa>(zz: &[i16; 64], matrix: &[u16; 64], dst: &mut [u16]
 /// Fills an 8x8 8-bit block with its DC value (`VMX_BROADCAST_DC_8X8_128`).
 pub(crate) fn broadcast_dc8(dc: i16, dst: &mut [u8], stride: usize, add: i16) {
     let v = dc.wrapping_add(4) >> 3;
-    let v = v.wrapping_add(add).clamp(0, 255) as u8;
-    for k in 0..8 {
-        dst[k * stride..k * stride + 8].fill(v);
+    let v = [v.wrapping_add(add).clamp(0, 255) as u8; 8];
+    for row in dst.chunks_mut(stride).take(8) {
+        row[..8].copy_from_slice(&v);
     }
 }
 

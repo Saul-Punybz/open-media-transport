@@ -123,6 +123,15 @@ impl BitWriter {
     }
 }
 
+/// One decoded AC stream symbol.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AcSymbol {
+    /// A run of this many zero coefficients.
+    Run(u64),
+    /// A non-zero coefficient's value code (see [`from_code`]).
+    Value(u64),
+}
+
 /// Error raised when a bitstream is malformed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Corrupt;
@@ -195,6 +204,34 @@ impl<'a> BitReader<'a> {
             return Err(Corrupt);
         }
         Ok(self.bits(n))
+    }
+
+    /// Reads one symbol of the AC stream: a run code (`1` prefix) or a value
+    /// code (`0` prefix). Same result and position as reading it with
+    /// [`bit`](Self::bit) and [`code_tail`](Self::code_tail), but from a
+    /// single 64-bit peek whenever the whole code is inside it.
+    #[inline(always)]
+    pub(crate) fn ac_symbol(&mut self) -> Result<AcSymbol, Corrupt> {
+        // A peek holds at least 57 valid bits. The longest code handled here
+        // is 2 + z + (z + 2) bits with z <= 26.
+        let w = self.peek64();
+        if w >> 62 == 0b11 {
+            self.pos += 2;
+            return Ok(AcSymbol::Run(1));
+        }
+        let run = w >> 63;
+        let head = 1 + run as u32; // `0` or `10`
+        let z = (w << head).leading_zeros();
+        if z <= 26 {
+            let n = z + 2;
+            let v = (w << (head + z)) >> (64 - n);
+            self.pos += (head + z + n) as usize;
+            return Ok(if run == 1 { AcSymbol::Run(v) } else { AcSymbol::Value(v) });
+        }
+        // Long or corrupt code: the bit-by-bit path, errors included.
+        self.pos += head as usize;
+        let v = self.code_tail()?;
+        Ok(if run == 1 { AcSymbol::Run(v) } else { AcSymbol::Value(v) })
     }
 
     /// Skips to the next byte boundary.
@@ -277,6 +314,57 @@ mod tests {
             b.put_value(v);
         }
         assert!(a.into_bytes() == b.into_bytes());
+    }
+
+    /// The old symbol reader: one bit at a time.
+    fn ac_symbol_bitwise(r: &mut BitReader) -> Result<AcSymbol, Corrupt> {
+        if r.bit() == 1 {
+            if r.bit() == 1 {
+                Ok(AcSymbol::Run(1))
+            } else {
+                Ok(AcSymbol::Run(r.code_tail()?))
+            }
+        } else {
+            Ok(AcSymbol::Value(r.code_tail()?))
+        }
+    }
+
+    #[test]
+    fn ac_symbol_matches_bitwise_reader() {
+        let mut seed = 0xA5A5_5A5A_1234_4321u64;
+        let mut rnd = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for case in 0..3000 {
+            // Real code sequences, sparse bits (long zero prefixes, corrupt
+            // codes), and random bytes, each possibly truncated.
+            let data: Vec<u8> = match case % 3 {
+                0 => {
+                    let mut w = BitWriter::default();
+                    for _ in 0..(rnd() % 300) {
+                        let v = (((rnd() % 65_537) as u32) >> (rnd() % 17)).max(1);
+                        w.put_run_value((rnd() % 100_000) as u32 >> (rnd() % 17), v);
+                    }
+                    w.into_bytes()
+                }
+                1 => (0..rnd() % 64).map(|_| if rnd() % 16 == 0 { rnd() as u8 } else { 0 }).collect(),
+                _ => (0..rnd() % 64).map(|_| rnd() as u8).collect(),
+            };
+            let cut = if data.is_empty() { 0 } else { (rnd() as usize) % (data.len() + 1) };
+            let data = if case % 2 == 0 { &data[..] } else { &data[..cut] };
+            let (mut a, mut b) = (BitReader::new(data), BitReader::new(data));
+            for _ in 0..2000 {
+                let (x, y) = (a.ac_symbol(), ac_symbol_bitwise(&mut b));
+                assert_eq!(x, y, "case {case}");
+                if x.is_err() {
+                    break;
+                }
+                assert_eq!(a.pos, b.pos, "case {case}");
+            }
+        }
     }
 
     #[test]

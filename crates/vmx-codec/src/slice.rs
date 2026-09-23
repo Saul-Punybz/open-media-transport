@@ -16,9 +16,10 @@
 //!
 //! Both streams are padded with zero bits to a byte boundary after each plane.
 
-use crate::bits::{from_code, to_code, BitReader, BitWriter, Corrupt};
+use crate::bits::{from_code, to_code, AcSymbol, BitReader, BitWriter, Corrupt};
 use crate::dct::{broadcast_dc8, fdct_quant_zig, idct16, idct8, Depth};
 use crate::lanes::Isa;
+use crate::tables::ZIGZAG;
 
 /// A sample type the planes can hold.
 pub(crate) trait Sample: Copy + Send + Sync {
@@ -139,17 +140,14 @@ pub(crate) fn decode_plane<T: Sample + DecodeOut, S: Isa>(
         for bx in (0..stride).step_by(8) {
             let mut block = [0i16; 64];
             let has_ac = pending < 64;
+            // Coefficients go straight to their natural (de-zig-zagged) slot.
             while pending < 64 {
-                if ac.bit() == 1 {
-                    if ac.bit() == 1 {
+                match ac.ac_symbol()? {
+                    AcSymbol::Run(n) => pending += n,
+                    AcSymbol::Value(v) => {
+                        block[ZIGZAG[pending as usize]] = from_code(v);
                         pending += 1;
-                    } else {
-                        pending += ac.code_tail()?;
                     }
-                } else {
-                    let v = ac.code_tail()?;
-                    block[pending as usize] = from_code(v);
-                    pending += 1;
                 }
             }
             pending -= 64;
