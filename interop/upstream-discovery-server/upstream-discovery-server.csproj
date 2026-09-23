@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Builds upstream's OMTDiscoveryServer console app (reference/upstream-OMTDiscoveryServer,
+    gitignored) unchanged, against libomtnet built from reference/libomtnet, so our
+    discovery client and server can be tested against the real thing.
+    Upstream targets net8.0 with AOT; this targets the installed SDK's net10.0 without AOT.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>OMTDiscoveryServer</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../reference/upstream-OMTDiscoveryServer/Program.cs" />
+    <ProjectReference Include="../../reference/libomtnet/libomtnet.csproj" SetTargetFramework="TargetFramework=netstandard2.0" />
+  </ItemGroup>
+
+</Project>
