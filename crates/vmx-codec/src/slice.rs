@@ -64,9 +64,12 @@ pub(crate) fn encode_plane<T: Sample, S: Isa>(
     shift: i16,
     matrix: &[u16; 192],
     dc_shift: u32,
-    dc: &mut BitWriter,
-    ac: &mut BitWriter,
+    dc_out: &mut BitWriter,
+    ac_out: &mut BitWriter,
 ) {
+    // Local accumulators stay in registers; see `BitAcc`.
+    let (mut dc, mut ac) = (dc_out.acc, ac_out.acc);
+    let (dcv, acv) = (&mut dc_out.buf, &mut ac_out.buf);
     let dc_round: i16 = if dc_shift > 0 { 1 << (dc_shift - 1) } else { 0 };
     let mut dc_pred: i16 = 0;
     let mut run: u32 = 0;
@@ -81,13 +84,16 @@ pub(crate) fn encode_plane<T: Sample, S: Isa>(
                 }
             }
             let zz = fdct_quant_zig::<S>(&block, T::DEPTH, matrix, -shift);
+            dc.reserve(dcv);
+            ac.reserve(acv);
+            let (dcb, acb) = (&mut dcv[..], &mut acv[..]);
 
             let d = zz[0].wrapping_add(dc_round) >> dc_shift;
             let diff = d as i32 - dc_pred as i32;
             if diff == 0 {
-                dc.put(0b11, 2);
+                dc.put(0b11, 2, dcb);
             } else {
-                dc.put_value(to_code(diff));
+                dc.put_value(to_code(diff), dcb);
             }
             dc_pred = d;
 
@@ -99,7 +105,7 @@ pub(crate) fn encode_plane<T: Sample, S: Isa>(
             while nz != 0 {
                 let i = nz.trailing_zeros();
                 run += i - pos;
-                ac.put_run_value(run, to_code(zz[i as usize] as i32));
+                ac.put_run_value(run, to_code(zz[i as usize] as i32), acb);
                 run = 0;
                 pos = i + 1;
                 nz &= nz - 1;
@@ -107,9 +113,11 @@ pub(crate) fn encode_plane<T: Sample, S: Isa>(
             run += 64 - pos;
         }
     }
-    ac.put_run(run);
-    ac.align();
-    dc.align();
+    ac.reserve(acv);
+    ac.put_run(run, acv);
+    ac.align(acv);
+    dc.align(dcv);
+    (dc_out.acc, ac_out.acc) = (dc, ac);
 }
 
 /// Decodes one plane of one slice into `rows` (`16 * stride` samples).

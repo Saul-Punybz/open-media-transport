@@ -29,96 +29,170 @@ pub(crate) fn from_code(code: u64) -> i16 {
     ((x >> 1).wrapping_sub(x.wrapping_mul(odd))) as i16
 }
 
-/// Growable MSB-first bit writer.
+/// Bytes of headroom [`BitAcc::reserve`] guarantees: more than one block of
+/// codes (64 codes of at most 67 bits, plus the 8-byte store).
+const SLACK: usize = 1024;
+
+/// The accumulator of a [`BitWriter`], usable on its own with the output
+/// buffer passed separately. Being a small `Copy` value, a local copy stays
+/// in registers across a hot loop (a `&mut BitWriter` would be reloaded and
+/// stored for every code).
 ///
-/// Bits collect in a 64-bit accumulator and leave it 32 at a time; only the
-/// low `nbits` (< 32 between calls) bits of `acc` are pending, anything
-/// above them has already been written.
-#[derive(Default)]
-pub(crate) struct BitWriter {
-    buf: Vec<u8>,
+/// Flushing is branchless: every `put` stores the accumulator's pending bits
+/// as 8 bytes at `pos` and advances `pos` by the whole bytes among them. The
+/// bytes after `pos` are scratch that later stores overwrite, so the buffer
+/// (whose length is only its initialised size) must keep 8 bytes of room
+/// past `pos`; callers make sure of that with [`reserve`](Self::reserve).
+#[derive(Clone, Copy, Default)]
+pub(crate) struct BitAcc {
     acc: u64,
+    /// Pending bits in the low end of `acc` (< 8 between calls).
     nbits: u32,
+    /// Bytes of the stream written so far.
+    pos: usize,
 }
 
-impl BitWriter {
-    pub(crate) fn with_capacity(n: usize) -> Self {
-        Self { buf: Vec::with_capacity(n), acc: 0, nbits: 0 }
+impl BitAcc {
+    /// Ensures `out` has room for [`SLACK`] more bytes (one block of codes).
+    #[inline(always)]
+    pub(crate) fn reserve(&self, out: &mut Vec<u8>) {
+        if out.len() < self.pos + SLACK {
+            grow(out, self.pos + SLACK);
+        }
     }
 
     /// Appends the low `n` bits of `v` (`n <= 64`).
     #[inline(always)]
-    pub(crate) fn put(&mut self, v: u64, n: u32) {
-        if n > 32 {
-            self.put_long(v, n);
+    pub(crate) fn put(&mut self, v: u64, n: u32, out: &mut [u8]) {
+        if n > 57 {
+            *self = self.put_long(v, n, out);
         } else {
-            self.put32(v, n);
+            self.put57(v, n, out);
         }
     }
 
+    /// Out of line and by value, so callers' accumulators never have their
+    /// address taken.
     #[cold]
     #[inline(never)]
-    fn put_long(&mut self, v: u64, n: u32) {
-        self.put32(v >> 32, n - 32);
-        self.put32(v & 0xFFFF_FFFF, 32);
+    fn put_long(mut self, v: u64, n: u32, out: &mut [u8]) -> Self {
+        self.put57(v >> 32, n - 32, out);
+        self.put57(v & 0xFFFF_FFFF, 32, out);
+        self
     }
 
-    /// Appends the low `n <= 32` bits of `v`.
+    /// Appends the low `n <= 57` bits of `v`.
     #[inline(always)]
-    fn put32(&mut self, v: u64, n: u32) {
+    fn put57(&mut self, v: u64, n: u32, out: &mut [u8]) {
+        // At most 7 + 57 = 64 pending bits; bits above them are stale.
         self.acc = (self.acc << n) | (v & ((1u64 << n) - 1));
         self.nbits += n;
-        if self.nbits >= 32 {
-            self.nbits -= 32;
-            self.buf.extend_from_slice(&((self.acc >> self.nbits) as u32).to_be_bytes());
-        }
+        // Left-justify the pending bits (a shift by 64 wraps to 0 when there
+        // are none; the stored bytes are then scratch past `pos`).
+        let top = self.acc.wrapping_shl(64 - self.nbits);
+        out[self.pos..self.pos + 8].copy_from_slice(&top.to_be_bytes());
+        self.pos += (self.nbits / 8) as usize;
+        self.nbits %= 8;
     }
 
     /// Value code for `v >= 1`.
     #[inline(always)]
-    pub(crate) fn put_value(&mut self, v: u32) {
+    pub(crate) fn put_value(&mut self, v: u32, out: &mut [u8]) {
         let bl = 32 - v.leading_zeros();
-        self.put(v as u64, 2 * bl - 1);
+        self.put(v as u64, 2 * bl - 1, out);
     }
 
     /// Run code for `n >= 1`; nothing for `n == 0`.
     #[inline(always)]
-    pub(crate) fn put_run(&mut self, n: u32) {
+    pub(crate) fn put_run(&mut self, n: u32, out: &mut [u8]) {
         if n == 0 {
             return;
         }
         let bl = 32 - n.leading_zeros();
-        self.put((1u64 << (2 * bl - 1)) | n as u64, 2 * bl);
+        self.put((1u64 << (2 * bl - 1)) | n as u64, 2 * bl, out);
     }
 
     /// Run code for `run` (nothing if 0) followed by the value code for
-    /// `v >= 1`, written with a single `put` when they fit in 32 bits.
+    /// `v >= 1`, written with a single `put` when they fit in 57 bits.
     #[inline(always)]
-    pub(crate) fn put_run_value(&mut self, run: u32, v: u32) {
+    pub(crate) fn put_run_value(&mut self, run: u32, v: u32, out: &mut [u8]) {
         let vl = 2 * (32 - v.leading_zeros()) - 1;
         let rbl = 32 - run.leading_zeros();
         let rl = 2 * rbl;
-        if rl + vl <= 32 {
+        if rl + vl <= 57 {
             // run == 0 gives rl == 0 and an empty run code.
             let rc = ((1u64 << rl) >> 1) | run as u64;
-            self.put32((rc << vl) | v as u64, rl + vl);
+            self.put57((rc << vl) | v as u64, rl + vl, out);
         } else {
-            self.put_run(run);
-            self.put_value(v);
+            self.put_run(run, out);
+            self.put_value(v, out);
         }
     }
 
     /// Pads with zero bits to the next byte boundary.
+    #[inline(always)]
+    pub(crate) fn align(&mut self, out: &mut [u8]) {
+        self.put57(0, (8 - self.nbits) % 8, out);
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn grow(out: &mut Vec<u8>, min: usize) {
+    out.resize(min.max(2 * out.len()), 0);
+}
+
+/// Growable MSB-first bit writer: a [`BitAcc`] and its output buffer.
+#[derive(Default)]
+pub(crate) struct BitWriter {
+    pub(crate) buf: Vec<u8>,
+    pub(crate) acc: BitAcc,
+}
+
+impl BitWriter {
+    pub(crate) fn with_capacity(n: usize) -> Self {
+        Self { buf: Vec::with_capacity(n), acc: BitAcc::default() }
+    }
+
+    /// Appends the low `n` bits of `v` (`n <= 64`).
+    #[cfg(test)]
+    pub(crate) fn put(&mut self, v: u64, n: u32) {
+        self.acc.reserve(&mut self.buf);
+        self.acc.put(v, n, &mut self.buf);
+    }
+
+    /// Value code for `v >= 1`.
+    #[cfg(test)]
+    pub(crate) fn put_value(&mut self, v: u32) {
+        self.acc.reserve(&mut self.buf);
+        self.acc.put_value(v, &mut self.buf);
+    }
+
+    /// Run code for `n >= 1`; nothing for `n == 0`.
+    #[cfg(test)]
+    pub(crate) fn put_run(&mut self, n: u32) {
+        self.acc.reserve(&mut self.buf);
+        self.acc.put_run(n, &mut self.buf);
+    }
+
+    /// See [`BitAcc::put_run_value`].
+    #[cfg(test)]
+    pub(crate) fn put_run_value(&mut self, run: u32, v: u32) {
+        self.acc.reserve(&mut self.buf);
+        self.acc.put_run_value(run, v, &mut self.buf);
+    }
+
+    /// Pads with zero bits to the next byte boundary.
+    #[cfg(test)]
     pub(crate) fn align(&mut self) {
-        self.put(0, (8 - self.nbits % 8) % 8);
+        self.acc.reserve(&mut self.buf);
+        self.acc.align(&mut self.buf);
     }
 
     pub(crate) fn into_bytes(mut self) -> Vec<u8> {
-        self.align();
-        while self.nbits > 0 {
-            self.nbits -= 8;
-            self.buf.push((self.acc >> self.nbits) as u8);
-        }
+        self.acc.reserve(&mut self.buf);
+        self.acc.align(&mut self.buf);
+        self.buf.truncate(self.acc.pos);
         self.buf
     }
 }
