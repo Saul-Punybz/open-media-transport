@@ -172,7 +172,7 @@ fn audio_and_metadata_round_trip() {
         samples[i] = (i as f32 / 480.0).sin();
         samples[2 * 480 + i] = -0.5;
     }
-    wait_for(|| tx.send_audio(&samples, 3, 48000, 99, b"<A />") == 1);
+    wait_for(|| tx.send_audio(&samples, 3, 48000, 99, b"<A />") == Ok(1));
     assert!(tx.send_metadata(b"<App X=\"1\" />\0", 5) >= 1);
 
     let mut dec = MediaDecoder::new(PreferredVideoFormat::Uyvy);
