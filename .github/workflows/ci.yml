@@ -26,5 +26,7 @@ jobs:
       # libvmx conformance tests skip themselves here.
       - run: cargo build --workspace --all-targets
       - run: cargo test -p vmx-codec -p open-media-transport -p omt-cli
+        # A hung test fails the job instead of running until GitHub's limit.
+        timeout-minutes: 15
       - run: cargo clippy -p open-media-transport -p omt-cli --all-targets -- -D warnings
       - run: cargo fmt -p open-media-transport -p omt-cli --check
