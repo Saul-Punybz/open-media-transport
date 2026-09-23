@@ -410,7 +410,7 @@ pub(crate) fn broadcast_dc8(dc: i16, dst: &mut [u8], stride: usize, add: i16) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lanes::Scalar;
+    use crate::lanes::{Isa, Scalar};
     use crate::simd::Native;
     use crate::tables::QUALITY_COUNT;
 
@@ -469,6 +469,30 @@ mod tests {
             let a = fdct_quant_zig::<Native>(&rows, depth, &matrix, add);
             let b = fdct_quant_zig::<Scalar>(&rows, depth, &matrix, add);
             assert_eq!(a, b, "{depth:?} add {add} rows {rows:?} matrix {matrix:?}");
+        }
+    }
+
+    #[test]
+    fn nonzero_mask_native_matches_scalar() {
+        let mut rng = Rng(0x7F4A_7C15_9E37_79B9);
+        for iter in 0..ITERS {
+            let density = iter % 9;
+            let mut zz = [0i16; 64];
+            for z in zz.iter_mut() {
+                if (rng.next() % 8) < density as u64 {
+                    *z = rng.edgy();
+                }
+            }
+            assert_eq!(Native::nonzero_mask(&zz), Scalar::nonzero_mask(&zz), "{zz:?}");
+        }
+        let mut zz = [0i16; 64];
+        for i in 0..64 {
+            for v in [1, -1, 128, -129, 256, i16::MIN, i16::MAX] {
+                zz[i] = v;
+                assert_eq!(Native::nonzero_mask(&zz), 1 << i);
+                assert_eq!(Scalar::nonzero_mask(&zz), 1 << i);
+            }
+            zz[i] = 0;
         }
     }
 

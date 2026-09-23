@@ -236,6 +236,25 @@ mod neon {
             unsafe { vst1_u8(r.as_mut_ptr(), vqmovun_s16(a)) };
             r
         }
+        #[inline(always)]
+        fn nonzero_mask(zz: &[i16; 64]) -> u64 {
+            const WEIGHTS: [u8; 16] = [1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128];
+            // SAFETY: every load reads 8 of the 64 i16 values of `zz`
+            // (offsets 0..=56), and `WEIGHTS` is 16 readable bytes.
+            unsafe {
+                let w = vld1q_u8(WEIGHTS.as_ptr());
+                // Saturating narrow keeps non-zero values non-zero; each byte
+                // becomes its bit weight if non-zero, and three pairwise-add
+                // rounds sum every group of eight into one mask byte.
+                let bits = |i: usize| {
+                    let p = zz.as_ptr().add(16 * i);
+                    let b = vcombine_s8(vqmovn_s16(vld1q_s16(p)), vqmovn_s16(vld1q_s16(p.add(8))));
+                    vandq_u8(vtstq_s8(b, b), w)
+                };
+                let p = vpaddq_u8(vpaddq_u8(bits(0), bits(1)), vpaddq_u8(bits(2), bits(3)));
+                vgetq_lane_u64::<0>(vreinterpretq_u64_u8(vpaddq_u8(p, p)))
+            }
+        }
     }
 }
 
@@ -389,6 +408,22 @@ mod sse2 {
             // bytes and has no alignment requirement.
             unsafe { _mm_storel_epi64(r.as_mut_ptr().cast(), _mm_packus_epi16(a, a)) };
             r
+        }
+        #[inline(always)]
+        fn nonzero_mask(zz: &[i16; 64]) -> u64 {
+            // SAFETY: every load reads 16 of the 128 bytes of `zz` (offsets
+            // 0..=112) without alignment requirements.
+            unsafe {
+                let p = zz.as_ptr();
+                let zero_bytes = |i: usize| {
+                    let a = _mm_loadu_si128(p.add(16 * i).cast());
+                    let b = _mm_loadu_si128(p.add(16 * i + 8).cast());
+                    // Saturating pack keeps non-zero values non-zero.
+                    let z = _mm_cmpeq_epi8(_mm_packs_epi16(a, b), _mm_setzero_si128());
+                    _mm_movemask_epi8(z) as u32 as u64
+                };
+                !(zero_bytes(0) | zero_bytes(1) << 16 | zero_bytes(2) << 32 | zero_bytes(3) << 48)
+            }
         }
     }
 }

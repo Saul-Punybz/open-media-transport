@@ -268,6 +268,17 @@ pub(crate) trait Isa: Copy {
     fn shufflehi<const IMM: i32>(a: Self::V16) -> Self::V16;
     fn unpacklo32(a: Self::V16, b: Self::V16) -> Self::V16;
     fn packus8(a: Self::V16) -> [u8; 8];
+
+    /// Bit `i` is set when `zz[i]` is non-zero (libvmx's
+    /// `packs` + `cmpeq` + `movemask` of a coded block).
+    #[inline(always)]
+    fn nonzero_mask(zz: &[i16; 64]) -> u64 {
+        let mut m = 0u64;
+        for (i, &c) in zz.iter().enumerate() {
+            m |= ((c != 0) as u64) << i;
+        }
+        m
+    }
 }
 
 /// Portable implementation of [`Isa`]: the lane emulation of this module.
