@@ -14,30 +14,38 @@
 //! - leaves silent audio channels out (A2);
 //! - never blocks on a slow receiver: each connection has at most 4 video or
 //!   audio frames and 64 metadata frames queued, and drops beyond that, as
-//!   libomtnet's send pools do (`OMTChannel.cs:207-218`, `OMTConstants.cs:46,51`).
+//!   libomtnet's send pools do (`OMTChannel.cs:207-218`, `OMTConstants.cs:46,51`);
+//! - can redirect its receivers to another source (§9, [`Sender::set_redirect`]).
 //!
-//! One deliberate difference: libomtnet's preview frames carry VMX bytes where
+//! Deliberate differences: libomtnet's preview frames carry VMX bytes where
 //! per-frame metadata should be (U2). Here the metadata follows the preview
 //! prefix, so receivers that take the last `MetadataLength` bytes get it right.
+//! And once a redirect has been cleared, libomtnet keeps sending
+//! `<OMTRedirect NewAddress="" />` to every new connection
+//! (`OMTRedirect.cs:59-63`, `OMTSend.cs:372-375`), which makes a libomtnet
+//! receiver ignore all later redirects (see [`crate::receiver`]); here a new
+//! connection gets a redirect only while one is active.
 
 use std::collections::VecDeque;
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::ops::RangeInclusive;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Condvar, Mutex};
+use std::sync::{mpsc, Arc, Condvar, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
 use socket2::{Domain, Protocol, Socket, Type};
 use vmx_codec::{Decoder, Encoder, EncoderConfig, Profile};
 
+use crate::address::Address;
 use crate::command::{classify, Command, Message, Quality, Tally};
-use crate::discovery::Discovery;
+use crate::discovery::{self, Discovery};
 use crate::frame::{
     self, AudioHeader, ExtendedHeader, VideoFlags, VideoHeader, CODEC_FPA1, CODEC_VMX1,
     VIDEO_HEADER_LEN,
 };
+use crate::redirect::{self, Watcher};
 use crate::{Deframer, Limits};
 
 /// libomtnet's default port range (`OMTConstants.cs:64-65`).
@@ -160,7 +168,16 @@ impl Sender {
         }
         on_connect.extend(config.connection_metadata.iter().cloned());
         let (metadata_tx, metadata_rx) = mpsc::sync_channel(MAX_UNREAD_METADATA);
+        // What a redirect to ourselves looks like (X4): our full name, as
+        // libomtnet compares (`OMTRedirect.cs:115-118`), and our URL (N4).
+        let machine = discovery::machine_name();
+        let self_names = vec![
+            discovery::full_name(&machine, &config.name),
+            format!("{}{machine}:{port}", crate::address::URL_PREFIX),
+        ];
         let shared = Arc::new(Shared {
+            redirect: Mutex::new(RedirectState::default()),
+            self_names,
             peers: Mutex::new(Vec::new()),
             on_connect,
             quality: config.quality,
@@ -209,6 +226,65 @@ impl Sender {
     /// `MACHINE (Name)` if announced.
     pub fn full_name(&self) -> Option<&str> {
         self.full_name.as_deref()
+    }
+
+    /// `omt://MACHINE:port`, the URL form of this sender's address (N4).
+    pub fn url(&self) -> &str {
+        &self.shared.self_names[1]
+    }
+
+    /// Tells receivers to use the source at `address` instead — a full name
+    /// or an `omt://` URL — or, with `None` or an empty string, cancels the
+    /// redirect (§9). The message goes to every metadata-subscribed
+    /// connection now and to each new connection while the redirect is active
+    /// (X1). A redirect to this sender itself is no redirect (X4).
+    ///
+    /// While redirected, the sender watches the target with a metadata-only
+    /// connection; if the target is itself redirected, receivers are sent
+    /// that address instead, and back again when it clears (X3). This follows
+    /// `OMTRedirect.SetRedirect` and `OnRedirectChanged`
+    /// (`OMTRedirect.cs:110-163`), including re-sending the message when the
+    /// address has not changed.
+    pub fn set_redirect(&self, address: Option<&str>) {
+        let mut new = address.filter(|a| !a.is_empty()).map(str::to_owned);
+        if new
+            .as_ref()
+            .is_some_and(|n| self.shared.self_names.contains(n))
+        {
+            new = None;
+        }
+        let (xml, old) = {
+            let mut r = self.shared.redirect.lock().unwrap();
+            if r.address != new {
+                r.upstream = None;
+            }
+            r.address = new.clone();
+            let keep = matches!((&new, &r.watcher), (Some(n), Some(w)) if w.address() == n);
+            let old = if keep { None } else { r.watcher.take() };
+            if let (Some(n), None) = (&new, &r.watcher) {
+                r.generation += 1;
+                let (weak, generation) = (Arc::downgrade(&self.shared), r.generation);
+                if let Ok(target) = Address::parse(n) {
+                    r.watcher =
+                        Watcher::start(target, None, move |a| upstream_heard(&weak, generation, a))
+                            .ok();
+                }
+            }
+            (r.xml(), old)
+        };
+        // Dropped unlocked: its thread may be waiting for the lock.
+        drop(old);
+        let mut out = Vec::new();
+        frame::write_metadata(0, xml.as_bytes(), &mut out);
+        self.shared.broadcast_metadata(Arc::new(out));
+    }
+
+    /// The address receivers are being redirected to, if any: the one set
+    /// with [`Sender::set_redirect`], or the target's own redirect (X3).
+    pub fn redirect(&self) -> Option<String> {
+        let r = self.shared.redirect.lock().unwrap();
+        r.address.as_ref()?;
+        Some(r.effective())
     }
 
     /// Open connections (a typical receiver uses two, T5).
@@ -425,6 +501,9 @@ impl Sender {
 
 impl Drop for Sender {
     fn drop(&mut self) {
+        // First, so its thread never holds the last reference to `Shared`.
+        let watcher = self.shared.redirect.lock().unwrap().watcher.take();
+        drop(watcher);
         if let (Some(d), Some(full)) = (&self.discovery, &self.full_name) {
             let _ = d.withdraw(full);
         }
@@ -445,7 +524,59 @@ impl Drop for Sender {
     }
 }
 
+/// Redirect state, as in libomtnet's `OMTRedirect` for a sender.
+#[derive(Default)]
+struct RedirectState {
+    /// Set by the application.
+    address: Option<String>,
+    /// What the target itself redirects to (`redirectAddressUpstream`).
+    upstream: Option<String>,
+    /// Metadata-only connection to `address`.
+    watcher: Option<Watcher>,
+    /// Tells a replaced watcher's late callbacks apart.
+    generation: u64,
+}
+
+impl RedirectState {
+    /// `OMTRedirect.cs:40-49`: the upstream address if there is one.
+    fn effective(&self) -> String {
+        match &self.upstream {
+            Some(u) if !u.is_empty() => u.clone(),
+            _ => self.address.clone().unwrap_or_default(),
+        }
+    }
+
+    fn xml(&self) -> String {
+        redirect::to_xml(&self.effective())
+    }
+}
+
+/// The redirect target announced a redirect of its own (`OMTRedirect.cs:128-163`).
+fn upstream_heard(shared: &Weak<Shared>, generation: u64, address: String) {
+    let Some(shared) = shared.upgrade() else {
+        return;
+    };
+    let xml = {
+        let mut r = shared.redirect.lock().unwrap();
+        if r.generation != generation
+            || shared.self_names[0] == address
+            || r.address.as_ref() == Some(&address)
+            || r.upstream.as_ref() == Some(&address)
+        {
+            return;
+        }
+        r.upstream = Some(address);
+        r.xml()
+    };
+    let mut out = Vec::new();
+    frame::write_metadata(0, xml.as_bytes(), &mut out);
+    shared.broadcast_metadata(Arc::new(out));
+}
+
 struct Shared {
+    redirect: Mutex<RedirectState>,
+    /// Our full name and URL (X4).
+    self_names: Vec<String>,
     peers: Mutex<Vec<Arc<Peer>>>,
     on_connect: Vec<Vec<u8>>,
     quality: Quality,
@@ -695,6 +826,16 @@ fn start_peer(stream: TcpStream, id: u64, shared: &Arc<Shared>) -> io::Result<()
     let tally = *shared.tally.lock().unwrap();
     frame::write_metadata(0, Command::Tally(tally).as_bytes(), &mut out);
     shared.queue(&peer, Arc::new(out), true);
+    // Then the redirect, if active (`OMTSend.cs:372-375`, X1).
+    let redirect = {
+        let r = shared.redirect.lock().unwrap();
+        r.address.is_some().then(|| r.xml())
+    };
+    if let Some(xml) = redirect {
+        let mut out = Vec::new();
+        frame::write_metadata(0, xml.as_bytes(), &mut out);
+        shared.queue(&peer, Arc::new(out), true);
+    }
 
     let writer_peer = peer.clone();
     let writer_shared = shared.clone();

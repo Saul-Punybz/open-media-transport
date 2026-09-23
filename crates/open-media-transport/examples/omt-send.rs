@@ -2,7 +2,12 @@
 //!
 //! ```sh
 //! cargo run --release -p open-media-transport --example omt-send -- "Rust Harness" 10
+//! cargo run --release -p open-media-transport --example omt-send -- "Rust Harness" 20 "3=HOST (Other)" 10=
 //! ```
+//!
+//! Arguments after the duration are a redirect schedule, `SECONDS=ADDRESS`:
+//! at that many seconds after start, call `set_redirect` with the address;
+//! an empty address clears the redirect (§9).
 //!
 //! 640x360 UYVY at 30 fps (a moving ramp), stereo 48 kHz audio with a 1 kHz
 //! sine on the left and silence on the right, and `<HarnessFrame N="n" />\0`
@@ -24,6 +29,19 @@ fn main() {
     let mut args = std::env::args().skip(1);
     let name = args.next().unwrap_or_else(|| "Rust Harness".into());
     let seconds: u64 = args.next().map_or(10, |s| s.parse().unwrap());
+    let mut schedule: Vec<(Duration, String)> = args
+        .map(|a| {
+            let (t, addr) = a
+                .split_once('=')
+                .expect("schedule entries are SECONDS=ADDRESS");
+            (
+                Duration::from_secs_f64(t.parse().expect("seconds")),
+                addr.to_owned(),
+            )
+        })
+        .collect();
+    schedule.sort_by_key(|e| e.0);
+    schedule.reverse();
 
     let mut config = SenderConfig::new(name);
     config.info = Some(SenderInfo {
@@ -51,12 +69,28 @@ fn main() {
     let mut audio = vec![0.0f32; samples * 2];
     // One clock per stream, like libomtnet's timestamp -1 mode (C2, C3).
     let (mut video_clock, mut audio_clock) = (Clock::new(), Clock::new());
-    let end = Instant::now() + Duration::from_secs(seconds);
+    let start = Instant::now();
+    let end = start + Duration::from_secs(seconds);
     let mut last_tally = tx.tally();
+    let mut last_redirect = None;
 
     for n in 0.. {
         if Instant::now() >= end {
             break;
+        }
+        while schedule.last().is_some_and(|e| start.elapsed() >= e.0) {
+            let (_, addr) = schedule.pop().unwrap();
+            tx.set_redirect(Some(&addr));
+            println!(
+                "send redirect t={:.1} set=\"{addr}\" effective={:?}",
+                start.elapsed().as_secs_f64(),
+                tx.redirect()
+            );
+        }
+        let t = tx.redirect();
+        if t != last_redirect {
+            println!("send redirect now={t:?}");
+            last_redirect = t;
         }
         fill_pattern(&mut frame.planes[0].data, n);
         let meta = if n % 30 == 0 {

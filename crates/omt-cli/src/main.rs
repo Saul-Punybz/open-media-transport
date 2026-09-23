@@ -2,13 +2,15 @@
 //!
 //! ```text
 //! omt list [--seconds N]
-//! omt send [--name NAME] [--size WxH] [--fps F] [--seconds N]
+//! omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE]
 //! omt recv SOURCE [--seconds N] [--snapshot FILE.bmp] [--preview]
 //! omt discovery-server [--port N] [--seconds N]
 //! ```
 //!
-//! `SOURCE` is a name as `omt list` shows it, e.g. `"MY-PC (Camera 1)"`, or
-//! `host:port`. `list`, `send` and `recv` take `--discovery-server URL` to
+//! `SOURCE` is a name as `omt list` shows it, e.g. `"MY-PC (Camera 1)"`, a URL
+//! `omt://host:port`, or `host:port`. A name is looked up again every time
+//! the receiver reconnects, so a source that restarts on another port is
+//! found again. `list`, `send` and `recv` take `--discovery-server URL` to
 //! use a discovery server, and `list` and `recv` take `--no-mdns` to use
 //! nothing else.
 
@@ -16,10 +18,12 @@ mod image;
 
 use std::fs::File;
 use std::io::BufWriter;
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::ToSocketAddrs;
 use std::process::ExitCode;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use open_media_transport::address::{Address, Directory};
 use open_media_transport::clock::Clock;
 use open_media_transport::command::{classify, Message, Quality};
 use open_media_transport::discovery::{Discovery, SourceEvent};
@@ -35,12 +39,14 @@ omt — Open Media Transport test tool (open-media-transport for Rust)
 USAGE:
   omt list [--seconds N]
       Show the OMT sources on the network (default 5 s).
-  omt send [--name NAME] [--size WxH] [--fps F] [--seconds N]
+  omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE]
       Send colour bars with a moving box and a 1 kHz beep once a second.
       Defaults: --name \"Test Pattern\" --size 1280x720 --fps 30, until Ctrl-C.
+      --redirect tells receivers to use SOURCE instead (a virtual source).
   omt recv SOURCE [--seconds N] [--snapshot FILE.bmp] [--preview]
-      Connect to SOURCE (a name from `omt list`, or host:port), print
-      statistics every second, and optionally save the last frame.
+      Connect to SOURCE (a name from `omt list`, omt://host:port, or
+      host:port), print statistics every second, and optionally save the
+      last frame. Follows redirects.
   omt discovery-server [--port N] [--seconds N]
       Run a discovery server for networks without multicast (default port
       6399), printing each client and source as it comes and goes.
@@ -176,6 +182,13 @@ fn send(args: &[String]) -> Result<()> {
         tx.full_name().unwrap_or(name),
         tx.port()
     );
+    if let Some(to) = opt(args, "--redirect") {
+        tx.set_redirect(Some(to));
+        match tx.redirect() {
+            Some(r) => println!("redirecting receivers to {r}"),
+            None => println!("--redirect {to} is this sender itself; not redirecting"),
+        }
+    }
 
     let params = VideoParams {
         frame_rate_n: fps_n,
@@ -236,29 +249,32 @@ fn send(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-fn resolve(source: &str, args: &[String]) -> Result<SocketAddr> {
-    if !source.contains('(') {
-        return source
-            .to_socket_addrs()
-            .map_err(|e| format!("cannot resolve {source}: {e}"))?
-            .next()
-            .ok_or(format!("no address for {source}"));
-    }
-    let d = discovery(args)?;
-    let browser = d.browse().map_err(|e| e.to_string())?;
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while let Some(left) = deadline.checked_duration_since(Instant::now()) {
-        if let Some(SourceEvent::Resolved(s)) = browser.recv_timeout(left) {
-            if s.full_name == source {
-                if let Some(ip) = s.addresses.first() {
-                    return Ok(SocketAddr::new(*ip, s.port));
-                }
+/// Connects by name or `omt://` URL through the library, which resolves the
+/// address again on every reconnect (§8); names are looked up with mDNS
+/// and/or the `--discovery-server`. `host:port` is a fixed address.
+fn connect(source: &str, config: ReceiverConfig, args: &[String]) -> Result<Receiver> {
+    let by_name = source.contains('(') || source.to_ascii_lowercase().starts_with("omt://");
+    if by_name {
+        let address = Address::parse(source).map_err(|e| format!("{source}: {e}"))?;
+        let directory = match address {
+            Address::Name(_) => Some(Arc::new(
+                Directory::with_discovery(discovery(args)?).map_err(|e| e.to_string())?,
+            )),
+            _ => None,
+        };
+        return Receiver::connect_address(address, config, directory).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => {
+                format!("\"{source}\" not found in 5 s (check the exact name with `omt list`)")
             }
-        }
+            _ => format!("cannot connect to {source}: {e}"),
+        });
     }
-    Err(format!(
-        "\"{source}\" not found in 5 s (check the exact name with `omt list`)"
-    ))
+    let addr = source
+        .to_socket_addrs()
+        .map_err(|e| format!("cannot resolve {source}: {e}"))?
+        .next()
+        .ok_or(format!("no address for {source}"))?;
+    Receiver::connect(addr, config).map_err(|e| format!("cannot connect to {addr}: {e}"))
 }
 
 #[derive(Default)]
@@ -277,17 +293,16 @@ fn recv(args: &[String]) -> Result<()> {
     let limit = seconds(args)?.map(Duration::from_secs);
     let snapshot = opt(args, "--snapshot");
     let preview = args.iter().any(|a| a == "--preview");
-    let addr = resolve(source, args)?;
-    println!("connecting to {source} at {addr}");
-    let rx = Receiver::connect(
-        addr,
+    println!("connecting to {source}");
+    let rx = connect(
+        source,
         ReceiverConfig {
             preview,
             quality: Quality::Default,
             ..ReceiverConfig::default()
         },
-    )
-    .map_err(|e| format!("cannot connect to {addr}: {e}"))?;
+        args,
+    )?;
 
     let start = Instant::now();
     let mut window = Window::default();
@@ -302,7 +317,12 @@ fn recv(args: &[String]) -> Result<()> {
     while limit.map_or(true, |l| start.elapsed() < l) {
         if let Some(event) = rx.recv_timeout(Duration::from_millis(100)) {
             match event {
-                Event::Connected(c) => println!("connected ({c:?} channel)"),
+                Event::Connected(c) => match rx.peer_addr() {
+                    Some(a) => println!("connected ({c:?} channel) to {a}"),
+                    None => println!("connected ({c:?} channel)"),
+                },
+                Event::Redirect(Some(to)) => println!("redirected to {to}"),
+                Event::Redirect(None) => println!("redirect cleared; back to {source}"),
                 Event::Closed(c, why) => {
                     println!("disconnected ({c:?} channel): {why:?} — retrying")
                 }
@@ -316,10 +336,7 @@ fn recv(args: &[String]) -> Result<()> {
                         }
                         Message::Command(c) => println!("sender says: {c:?}"),
                         Message::Redirect(x) => {
-                            println!(
-                                "redirect (not followed yet): {}",
-                                String::from_utf8_lossy(x)
-                            )
+                            println!("sender says: {}", String::from_utf8_lossy(x))
                         }
                         Message::QualityOther(_) => {}
                     },

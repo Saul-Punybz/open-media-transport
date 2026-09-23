@@ -3,9 +3,12 @@
 //! ```sh
 //! cargo run -p open-media-transport --example omt-recv -- 127.0.0.1:6400 5
 //! cargo run -p open-media-transport --example omt-recv -- "MY-MAC.LOCAL (Camera)" 5
+//! cargo run -p open-media-transport --example omt-recv -- omt://my-mac.local:6400 5
 //! ```
 //!
-//! A name containing `(` is looked up with DNS-SD first. A third argument
+//! A full name is looked up with DNS-SD, and looked up again whenever the
+//! receiver reconnects; an `omt://` URL is resolved with DNS (§8). Redirects
+//! are followed and printed (§9). A third argument
 //! `preview` asks for 1/8 preview video (§6.2); preview frames are decoded
 //! with `decode_preview` and hashed as UYVY, like libomtnet delivers them.
 //!
@@ -16,11 +19,10 @@
 //! `<HarnessFrame N="n" />`, it also compares the pixels with the pattern the
 //! harness sent and prints the PSNR.
 
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::ToSocketAddrs;
 use std::time::{Duration, Instant};
 
 use open_media_transport::command::{classify, Message, Quality, Tally};
-use open_media_transport::discovery::{Discovery, SourceEvent};
 use open_media_transport::frame::{ExtendedHeader, VideoFlags, CODEC_FPA1, CODEC_VMX1};
 use open_media_transport::receiver::{Event, Receiver, ReceiverConfig};
 use vmx_codec::{Decoder, PixelFormat};
@@ -29,17 +31,8 @@ fn main() {
     let mut args = std::env::args().skip(1);
     let target = args
         .next()
-        .expect("usage: omt-recv HOST:PORT|\"MACHINE (Name)\" [SECONDS]");
-    let addr = if target.contains('(') {
-        find(&target, Duration::from_secs(5))
-    } else {
-        target
-            .to_socket_addrs()
-            .expect("resolve address")
-            .next()
-            .expect("no address")
-    };
-    println!("connecting to {addr}");
+        .expect("usage: omt-recv HOST:PORT|\"MACHINE (Name)\"|omt://HOST:PORT [SECONDS]");
+    println!("connecting to {target}");
     let seconds: u64 = args.next().map(|s| s.parse().unwrap()).unwrap_or(5);
     let preview = args.next().as_deref() == Some("preview");
 
@@ -52,7 +45,16 @@ fn main() {
         },
         ..ReceiverConfig::default()
     };
-    let rx = Receiver::connect(addr, config).expect("connect");
+    let rx = if target.contains('(') || target.to_ascii_lowercase().starts_with("omt://") {
+        Receiver::connect_to(&target, config).expect("connect")
+    } else {
+        let addr = target
+            .to_socket_addrs()
+            .expect("resolve address")
+            .next()
+            .expect("no address");
+        Receiver::connect(addr, config).expect("connect")
+    };
     let mut decoder: Option<(i32, i32, Decoder)> = None;
     let (mut video, mut audio) = (0u32, 0u32);
     let (mut silent_ch1, mut audio_rms) = (true, 0.0f64);
@@ -65,7 +67,14 @@ fn main() {
         let (channel, f) = match event {
             Event::Frame(c, f) => (c, f),
             Event::Connected(c) => {
-                println!("connected {c:?}");
+                match rx.peer_addr() {
+                    Some(a) => println!("connected {c:?} {a}"),
+                    None => println!("connected {c:?}"),
+                }
+                continue;
+            }
+            Event::Redirect(to) => {
+                println!("redirect to {}", to.as_deref().unwrap_or("(original)"));
                 continue;
             }
             Event::Closed(c, why) => {
@@ -159,27 +168,6 @@ fn main() {
         }
     }
     println!("done video={video} audio={audio} ch0_rms={audio_rms:.4} ch1_silent={silent_ch1}");
-}
-
-/// Browses until `full_name` resolves; returns its first address (IPv4 first).
-fn find(full_name: &str, timeout: Duration) -> SocketAddr {
-    let d = Discovery::new().expect("start mDNS");
-    let browser = d.browse().expect("browse");
-    let deadline = Instant::now() + timeout;
-    while let Some(left) = deadline.checked_duration_since(Instant::now()) {
-        if let Some(SourceEvent::Resolved(s)) = browser.recv_timeout(left) {
-            if s.full_name == full_name {
-                if let Some(ip) = s.addresses.first() {
-                    println!(
-                        "discovered \"{}\" at {}:{} ({})",
-                        s.full_name, ip, s.port, s.host
-                    );
-                    return SocketAddr::new(*ip, s.port);
-                }
-            }
-        }
-    }
-    panic!("\"{full_name}\" not found within {timeout:?}");
 }
 
 /// Packs a `Yuv422p` frame (what `decode_preview` returns) as UYVY.
