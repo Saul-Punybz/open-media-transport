@@ -1384,7 +1384,9 @@ mod tests {
         });
         let mut audio = vec![0.0f32; 2 * 100];
         audio[..100].fill(0.5);
-        assert_eq!(tx.send_audio(&audio, 2, 48000, 7, b""), Ok(1));
+        // The audio connection counts as connected before its subscription is
+        // processed; until then nothing is sent (seen on a CI runner).
+        wait_for(|| tx.send_audio(&audio, 2, 48000, 7, b"") == Ok(1));
 
         let (mut info, mut video, mut audio_hdr) = (false, None, None);
         let deadline = Instant::now() + Duration::from_secs(3);
