@@ -10,7 +10,8 @@ Built from `main` at `48c3984`:
 - WinLibs MinGW 16.2 provides `dlltool` and `g++`
 
 The first real run of this project on Windows hardware (CI aside), and the first native x86_64 run of the codec.
-No OMT product and no second machine were involved.
+It includes interop with libomtnet on Windows (section 6).
+No other OMT product and no second machine were involved.
 
 ## 1. v0.1.0 release binary does not start on a clean Windows
 
@@ -109,9 +110,47 @@ It suggests more threads only while there are cores left:
 warning: sending 14.5 fps of the requested 30.00; video and audio are falling behind real time (try --threads 2 or a smaller --size)
 ```
 
+## 6. Interop with libomtnet on Windows
+
+The output is in `libomtnet-interop-output.txt`.
+
+Setup:
+- libomtnet at `029ef4e` (v1.0.0.19), through `interop/libomtnet-harness`, on .NET 10.0.401
+- libvmx at `544bcfb`, built as `libvmx.dll` with MinGW g++ 16.2 (`-O3 -mavx2 -mbmi -mlzcnt -msse4.2 -Wno-narrowing`, static libstdc++) and copied next to the harness
+- Both run on one machine; the harness's `OMTDiscovery` uses libomtnet's Windows path (`OMTDiscoveryWin32`, DnsServiceBrowse)
+
+Results:
+- **A. libomtnet finds our sender.**
+  - `list` shows `"DESKTOP-QRLFQ6I (Rust Test)"`, resolved to `172.16.80.58:6400`.
+  - Our SRV target `<host>-omt.local.` resolves through the Windows DNS-SD API, which is the top risk in STATUS.md for vMix on Windows. It holds on this machine, on one host only.
+- **B. `omt send` → libomtnet `recv` by name, 1280x720 at 30 fps, for 10 s:**
+  - `recv done video=300 audio=299 info=omt/open-media-transport/0.1.0`
+  - our sender printed the program tally libomtnet sets (`tally=PGM`)
+- **C. libomtnet `send` → `omt`:**
+  - `omt list` finds `"DESKTOP-QRLFQ6I (Harness)"` at `DESKTOP-QRLFQ6I.local:6400`; libomtnet uses the OS host name
+  - `omt recv` by name connects both channels
+  - it receives the harness's sender info and connection metadata (`<HarnessHello Value="1" />`)
+  - about 30 fps, audio in 30 of 30 frames, 0 decode errors
+  - snapshot: `snapshot-from-libomtnet-640x360.png`
+
+Seen in libomtnet's own log, not ours: `OMTDiscoveryWin32` logs `NetworkInformationException (10043)`.
+
+How it happens:
+- `MDNSClient.CreateMulticastSockets` calls `GetIPv4Properties()` on every multicast-capable, non-loopback interface (`src/mdns/MDNSClient.cs:82-91`), with no try/catch.
+- On this machine one interface throws 10043. Which one was not identified; the machine has adapters without IPv4 (Bluetooth PAN, Wi-Fi Direct virtual adapters).
+- The exception leaves the `MDNSClient` constructor (`MDNSClient.cs:61`). `BeginDNSClient` catches and logs it (`src/win32/OMTDiscoveryWin32.cs:118-127`), so `mdnsClient` is never created.
+
+What that client is: it re-sends the `_omt._tcp.local` PTR query every 8 s (`SEND_INTERVAL_MILLISECONDS = 8000`, `MDNSClient.cs:46`, `RefreshTimerCallback` at `:169`).
+That is the Windows browse-freshness mechanism listed as a testing-week risk in STATUS.md.
+On a machine like this one, libomtnet runs without it and relies on DnsServiceBrowse alone.
+DnsServiceBrowse still found our sender here, but how quickly sources appear and disappear without the re-query was not measured.
+
+This is worth reporting upstream: skipping an interface whose `GetIPv4Properties()` throws would keep the client working.
+
+Decoded pixels were not compared on Windows; the harness only hashes frames that carry per-frame metadata, and `omt send` sends none.
+The Mac evidence already covers pixel identity.
+
 ## Not tested
 
-- vMix, OBS, a second machine
-- libomtnet on Windows: its Windows discovery path is the top risk in STATUS.md
-  - .NET 10.0.401 is installed here, and `reference/libomtnet` is cloned at `029ef4e`
-  - building and running it was left for the maintainer to approve
+- vMix, OBS
+- a second machine

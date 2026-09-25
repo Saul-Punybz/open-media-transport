@@ -94,7 +94,12 @@ Still only libomtnet on one Mac: **no vMix, OBS or Pi.**
   - unknown options are errors
 
   It conflicts with `feat/tester-kit`'s CLI rewrite, so the two will need merging.
-- **Still not run:** libomtnet on Windows.
+- **libomtnet on Windows, one machine, both ways by name:**
+  - libomtnet's Windows discovery (DnsServiceBrowse) resolves our `<host>-omt.local.` SRV target, and tally works
+  - upstream bug found: on this machine an adapter throws 10043 in `MDNSClient.CreateMulticastSockets` (`MDNSClient.cs:91`)
+    - the whole libomtnet `MDNSClient`, the 8 s PTR re-query behind the "Windows browse freshness" risk, is never created
+    - discovery then relies on DnsServiceBrowse alone
+  - still no vMix, OBS or second machine
 
 **Goal for the week of 23 Sep 2026 (maintainer's request):** everything that does not need real
 equipment is finished, so the maintainer's vMix / OBS / Raspberry Pi testing week is the only thing
