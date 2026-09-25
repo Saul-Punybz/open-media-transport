@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! omt list [--seconds N]
-//! omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE] [--10bit]
+//! omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE] [--10bit] [--threads N]
 //! omt recv SOURCE [--seconds N] [--snapshot FILE.bmp|FILE.png] [--preview]
 //! omt discovery-server [--port N] [--seconds N]
 //! ```
@@ -41,10 +41,13 @@ USAGE:
   omt list [--seconds N]
       Show the OMT sources on the network (default 5 s).
   omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE] [--10bit]
+           [--threads N]
       Send colour bars with a moving box and a 1 kHz beep once a second.
       Defaults: --name \"Test Pattern\" --size 1280x720 --fps 30, until Ctrl-C.
       --redirect tells receivers to use SOURCE instead (a virtual source).
       --10bit sends a 10-bit (P216) source instead of 8-bit UYVY.
+      --threads sets the encoder threads (default 1); raise it when send
+      warns that it cannot keep up.
   omt recv SOURCE [--seconds N] [--snapshot FILE.bmp|FILE.png] [--preview]
       Connect to SOURCE (a name from `omt list`, omt://host:port, or
       host:port), print statistics every second, and optionally save the
@@ -54,6 +57,7 @@ USAGE:
       Run a discovery server for networks without multicast (default port
       6399), printing each client and source as it comes and goes.
   omt version
+  omt help
 
   list, send and recv also take --discovery-server omt://HOST[:PORT]: send
   then registers with that server instead of announcing over mDNS; list and
@@ -62,6 +66,11 @@ USAGE:
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|a| a == "--help" || a == "-h") || args.first().is_some_and(|a| a == "help")
+    {
+        print!("{USAGE}");
+        return ExitCode::SUCCESS;
+    }
     let result = match args.first().map(String::as_str) {
         Some("list") => list(&args[1..]),
         Some("send") => send(&args[1..]),
@@ -86,6 +95,41 @@ fn main() -> ExitCode {
 }
 
 type Result<T> = std::result::Result<T, String>;
+
+/// Rejects anything a subcommand does not take, so a typo such as `--fsp 60`
+/// is an error instead of silently sending with the defaults. `values` are
+/// options followed by a value, `switches` stand alone, and up to
+/// `positional` bare arguments are allowed.
+fn check_args(
+    args: &[String],
+    values: &[&str],
+    switches: &[&str],
+    positional: usize,
+) -> Result<()> {
+    let mut bare = 0;
+    let mut i = 0;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if values.contains(&a) {
+            if i + 1 >= args.len() {
+                return Err(format!("{a} needs a value"));
+            }
+            i += 2;
+            continue;
+        }
+        if !switches.contains(&a) {
+            if a.starts_with('-') {
+                return Err(format!("unknown option {a} (see `omt --help`)"));
+            }
+            bare += 1;
+            if bare > positional {
+                return Err(format!("unexpected argument {a} (see `omt --help`)"));
+            }
+        }
+        i += 1;
+    }
+    Ok(())
+}
 
 /// `--flag value` lookup.
 fn opt<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
@@ -114,6 +158,12 @@ fn discovery(args: &[String]) -> Result<Discovery> {
 }
 
 fn list(args: &[String]) -> Result<()> {
+    check_args(
+        args,
+        &["--seconds", "--discovery-server"],
+        &["--no-mdns"],
+        0,
+    )?;
     let secs = seconds(args)?.unwrap_or(5);
     let d = discovery(args)?;
     let browser = d.browse().map_err(|e| e.to_string())?;
@@ -157,6 +207,20 @@ fn parse_fps(s: &str) -> Result<(i32, i32)> {
 }
 
 fn send(args: &[String]) -> Result<()> {
+    check_args(
+        args,
+        &[
+            "--name",
+            "--size",
+            "--fps",
+            "--seconds",
+            "--redirect",
+            "--discovery-server",
+            "--threads",
+        ],
+        &["--10bit"],
+        0,
+    )?;
     let name = opt(args, "--name").unwrap_or("Test Pattern");
     let (w, h) = match opt(args, "--size") {
         Some(s) => {
@@ -172,9 +236,17 @@ fn send(args: &[String]) -> Result<()> {
     let fps = fps_n as f64 / fps_d as f64;
     let limit = seconds(args)?.map(Duration::from_secs);
     let ten_bit = args.iter().any(|a| a == "--10bit");
+    let threads = match opt(args, "--threads") {
+        Some(t) => match t.parse::<usize>() {
+            Ok(n) if n >= 1 => n,
+            _ => return Err(format!("bad --threads {t}")),
+        },
+        None => 1,
+    };
 
     let mut config = SenderConfig::new(name);
     config.discovery_server = opt(args, "--discovery-server").map(str::to_owned);
+    config.encoder_threads = threads;
     config.info = Some(SenderInfo {
         product_name: "omt".into(),
         manufacturer: "open-media-transport".into(),
@@ -214,6 +286,8 @@ fn send(args: &[String]) -> Result<()> {
     let mut last_report = Instant::now();
     let mut samples_sent = 0usize;
     let mut last_tally = tx.tally();
+    let mut report_frames = 0u64;
+    let cores = std::thread::available_parallelism().map_or(1, |n| n.get());
     for n in 0u64.. {
         if limit.is_some_and(|l| start.elapsed() >= l) {
             break;
@@ -248,8 +322,26 @@ fn send(args: &[String]) -> Result<()> {
                 .map_err(|e| format!("audio: {e}"))?;
         }
 
+        report_frames += 1;
         let t = tx.tally();
         if t != last_tally || last_report.elapsed() >= Duration::from_secs(5) {
+            // The loop is paced by `Clock`, so falling short of the requested
+            // rate means encoding is too slow. Audio is sent in the same loop
+            // and falls behind with the video; `dropped` does not show this.
+            let window = last_report.elapsed().as_secs_f64();
+            let achieved = report_frames as f64 / window;
+            if window >= 1.0 && achieved < fps * 0.95 {
+                let hint = if threads < cores {
+                    format!("try --threads {} or a smaller --size", threads + 1)
+                } else {
+                    "try a smaller --size or a lower --fps".to_owned()
+                };
+                println!(
+                    "warning: sending {achieved:.1} fps of the requested {fps:.2}; video and audio \
+                     are falling behind real time ({hint})"
+                );
+            }
+            report_frames = 0;
             let st = tx.stats();
             println!(
                 "{:>6.1}s  connections={} video_receivers={} tally={}{} dropped={}",
@@ -304,6 +396,12 @@ struct Window {
 }
 
 fn recv(args: &[String]) -> Result<()> {
+    check_args(
+        args,
+        &["--seconds", "--snapshot", "--discovery-server"],
+        &["--preview", "--no-mdns"],
+        1,
+    )?;
     let source = args
         .first()
         .filter(|a| !a.starts_with("--"))
@@ -455,6 +553,7 @@ fn recv(args: &[String]) -> Result<()> {
 }
 
 fn serve_discovery(args: &[String]) -> Result<()> {
+    check_args(args, &["--port", "--seconds"], &[], 0)?;
     let port = match opt(args, "--port") {
         Some(p) => p.parse().map_err(|_| format!("bad --port {p}"))?,
         None => discovery_server::DEFAULT_PORT,
@@ -482,4 +581,47 @@ fn serve_discovery(args: &[String]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_args;
+
+    fn args(a: &[&str]) -> Vec<String> {
+        a.iter().map(|s| s.to_string()).collect()
+    }
+
+    const VALUES: &[&str] = &["--fps", "--seconds"];
+    const SWITCHES: &[&str] = &["--10bit"];
+
+    #[test]
+    fn known_options_pass() {
+        let a = args(&["--fps", "59.94", "--10bit", "--seconds", "5"]);
+        assert!(check_args(&a, VALUES, SWITCHES, 0).is_ok());
+    }
+
+    #[test]
+    fn typo_is_an_error_not_the_default() {
+        let err = check_args(&args(&["--fsp", "60"]), VALUES, SWITCHES, 0).unwrap_err();
+        assert!(err.contains("--fsp"), "{err}");
+    }
+
+    #[test]
+    fn missing_value_is_an_error() {
+        let err = check_args(&args(&["--fps"]), VALUES, SWITCHES, 0).unwrap_err();
+        assert!(err.contains("needs a value"), "{err}");
+    }
+
+    #[test]
+    fn a_value_may_look_like_an_option() {
+        // `--seconds` consumes the next argument whatever it looks like.
+        assert!(check_args(&args(&["--seconds", "-1"]), VALUES, SWITCHES, 0).is_ok());
+    }
+
+    #[test]
+    fn positional_arguments_are_counted() {
+        assert!(check_args(&args(&["MY-PC (Cam)", "--10bit"]), VALUES, SWITCHES, 1).is_ok());
+        assert!(check_args(&args(&["a", "b"]), VALUES, SWITCHES, 1).is_err());
+        assert!(check_args(&args(&["a"]), VALUES, SWITCHES, 0).is_err());
+    }
 }
