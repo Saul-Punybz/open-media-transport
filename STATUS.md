@@ -80,6 +80,22 @@ the local `dist/v0.1.0/SHA256SUMS`. `release.yml` builds `omt` for four targets 
 - **M12 prerequisites** — `Sender::send_encoded_video` (pre-encoded VMX1; a libomtnet receiver decoded it to identical pixels), `SenderConfig::encoder_threads`, `SendError` instead of panics (**breaking:** `send_video`/`send_audio` return `Result<usize, SendError>`), sender/peer/receiver stats, one shared `Discovery` with interface selection (`DiscoveryConfig`), bounded `Drop` (2 s), and a `vmx_decode` fuzz target. It found `preview_len` miscounting an extended header with DC shift 0 — fixed, regression test in `decoder.rs`.
 Still only libomtnet on one Mac: **no vMix, OBS or Pi.**
 
+**25 Sep 2026: first run on Windows hardware.** Intel NUC, i3-7100U, Windows 11; evidence in `docs/evidence/2026-09-25-windows-nuc`.
+- **v0.1.0 Windows binary:** does not start on a clean Windows (needs `VCRUNTIME140.dll`). `feat/release-ci`'s static CRT is the fix, so merge it before the next release.
+- **`main` on Windows:**
+  - tests pass
+  - `list` and send/recv by name work on one machine
+  - vmx-codec conformance passes on native x86_64
+- **x86 codec speed:** vmx-codec (SSE2) is 1.6–2x slower than libvmx (AVX2); AVX2 kernels matter more than the M4 numbers suggested.
+- **One-thread encoder:** falls behind at 1080p59.94 and 2160p30 on this CPU, silently.
+- **Fixes on branch `fix/cli-args-threads-pacing`:**
+  - `send --threads`
+  - a falling-behind warning
+  - unknown options are errors
+
+  It conflicts with `feat/tester-kit`'s CLI rewrite, so the two will need merging.
+- **Still not run:** libomtnet on Windows.
+
 **Goal for the week of 23 Sep 2026 (maintainer's request):** everything that does not need real
 equipment is finished, so the maintainer's vMix / OBS / Raspberry Pi testing week is the only thing
 left. Windows CI fixed and merged 23 Sep (`3f84881`, `src/net.rs`: on Windows `shutdown()` does not

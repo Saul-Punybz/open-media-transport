@@ -1,0 +1,32 @@
+07:51:00 sender pid=8812
+07:51:11 === NETWORK: ip=172.16.80.58 ssid= ===
+07:51:17 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 28.0 fps received | sender_alive=True
+07:51:25 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:51:32 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.0 fps received | sender_alive=True
+07:51:42 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.8 fps received | sender_alive=True
+07:51:53 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:52:02 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.9 fps received | sender_alive=True
+07:52:19 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.4 fps received | sender_alive=True
+07:52:27 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:52:34 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.9 fps received | sender_alive=True
+07:52:41 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:52:49 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:52:56 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:53:06 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.3 fps received | sender_alive=True
+07:53:13 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.7 fps received | sender_alive=True
+07:53:21 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.8 fps received | sender_alive=True
+07:53:29 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:53:36 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:53:44 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.4 fps received | sender_alive=True
+07:53:51 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:53:59 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.5 fps received | sender_alive=True
+07:54:07 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.9 fps received | sender_alive=True
+07:54:14 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.7 fps received | sender_alive=True
+07:54:22 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.9 fps received | sender_alive=True
+07:54:30 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.7 fps received | sender_alive=True
+07:54:37 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:54:45 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.4 fps received | sender_alive=True
+07:54:52 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.8 fps received | sender_alive=True
+07:55:00 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 29.9 fps received | sender_alive=True
+07:55:07 ip=172.16.80.58 | list OK "DESKTOP-QRLFQ6I (NetChange)" DESKTOP-QRLFQ6I-omt.local:6400 [172.16.80.58] | recv OK 30.0 fps received | sender_alive=True
+07:55:10 end
