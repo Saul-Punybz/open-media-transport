@@ -633,6 +633,11 @@ struct Entry {
     from: SocketAddr,
 }
 
+/// Most sources one connection may register, and most in the whole table, so no
+/// client can flood the server (§ security). libomtnet has no such limit.
+const MAX_ENTRIES_PER_PEER: usize = 64;
+const MAX_ENTRIES_TOTAL: usize = 4096;
+
 struct Peer {
     id: u64,
     addr: SocketAddr,
@@ -849,6 +854,13 @@ impl ServerShared {
             .position(|e| e.address.full_name == m.full_name && e.address.port == m.port);
         match (known, m.removed) {
             (None, false) => {
+                // Flood guard: cap sources per connection and in total, so one
+                // client cannot fill the table (§ security). libomtnet has no
+                // such limit.
+                let mine = t.entries.iter().filter(|e| e.peer == peer.id).count();
+                if mine >= MAX_ENTRIES_PER_PEER || t.entries.len() >= MAX_ENTRIES_TOTAL {
+                    return;
+                }
                 m.addresses.clear();
                 m.add_address(peer.addr.ip());
                 broadcast(&t, &m);
@@ -861,6 +873,12 @@ impl ServerShared {
                 self.event(ServerEvent::Added(peer.addr, m));
             }
             (Some(i), true) => {
+                // Only the connection that registered a source may withdraw it,
+                // so a client cannot remove another's sources (§ security).
+                // libomtnet lets any connection remove; we deliberately do not.
+                if t.entries[i].peer != peer.id {
+                    return;
+                }
                 let mut e = t.entries.remove(i);
                 e.address.removed = true;
                 broadcast(&t, &e.address);
@@ -1044,6 +1062,70 @@ mod tests {
         drop(a);
         wait_for(&feed, |e| *e == SourceEvent::Removed("HOST (a2)".into()));
         assert!(server.entries().is_empty());
+    }
+
+    fn wait_entries(server: &Server, pred: impl Fn(&[ServerEntry]) -> bool) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < deadline {
+            if pred(&server.entries()) {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        false
+    }
+
+    #[test]
+    fn a_client_cannot_withdraw_another_clients_source() {
+        let server = Server::bind(0).unwrap();
+        let url = format!("omt://127.0.0.1:{}", server.port());
+        let a = Client::connect(&url).unwrap();
+        a.register("HOST (shared)", 6401);
+        assert!(wait_entries(&server, |es| es
+            .iter()
+            .any(|e| e.address.full_name == "HOST (shared)")));
+
+        // b registers the same name (the server ignores the duplicate), then
+        // withdraws it — a Removed the server must not honour, since b does not
+        // own a's entry.
+        let b = Client::connect(&url).unwrap();
+        b.register("HOST (shared)", 6401);
+        std::thread::sleep(Duration::from_millis(150));
+        b.deregister("HOST (shared)");
+        std::thread::sleep(Duration::from_millis(250));
+
+        assert!(
+            server
+                .entries()
+                .iter()
+                .any(|e| e.address.full_name == "HOST (shared)"),
+            "b withdrew a's source"
+        );
+
+        // a can still withdraw its own.
+        a.deregister("HOST (shared)");
+        assert!(wait_entries(&server, |es| es
+            .iter()
+            .all(|e| e.address.full_name != "HOST (shared)")));
+    }
+
+    #[test]
+    fn the_server_caps_sources_per_client() {
+        let server = Server::bind(0).unwrap();
+        let url = format!("omt://127.0.0.1:{}", server.port());
+        let a = Client::connect(&url).unwrap();
+        for i in 0..(MAX_ENTRIES_PER_PEER + 40) {
+            a.register(&format!("HOST (s{i})"), 6400 + (i as u16 % 100));
+        }
+        // Wait until the server has processed up to the cap, then confirm it
+        // never went past it.
+        wait_entries(&server, |es| es.len() >= MAX_ENTRIES_PER_PEER);
+        std::thread::sleep(Duration::from_millis(250));
+        assert!(
+            server.entries().len() <= MAX_ENTRIES_PER_PEER,
+            "server holds {} sources; the per-client cap is {MAX_ENTRIES_PER_PEER}",
+            server.entries().len()
+        );
     }
 
     #[test]
