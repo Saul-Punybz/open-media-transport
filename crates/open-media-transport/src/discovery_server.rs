@@ -1182,14 +1182,27 @@ mod tests {
         let c = Client::connect(&url).unwrap();
         let (held, _) = listener.accept().unwrap();
         let name = format!("{} (big)", "B".repeat(60_000));
-        let start = Instant::now();
-        for i in 0..200 {
+        // Register until a call has to wait: the socket buffers are full and
+        // the write timed out. That call, and dropping the client, must end.
+        let mut slowest = Duration::ZERO;
+        for i in 0..2000 {
+            let start = Instant::now();
             c.register(&format!("{name}{i}"), 6400);
+            slowest = slowest.max(start.elapsed());
+            if slowest > Duration::from_secs(1) {
+                break;
+            }
         }
+        assert!(slowest > Duration::from_secs(1), "the buffers never filled");
+        assert!(
+            slowest < Duration::from_secs(5),
+            "a register took {slowest:?}"
+        );
+        let start = Instant::now();
         drop(c);
         assert!(
-            start.elapsed() < Duration::from_secs(20),
-            "took {:?}",
+            start.elapsed() < Duration::from_secs(5),
+            "drop took {:?}",
             start.elapsed()
         );
         drop(held);
