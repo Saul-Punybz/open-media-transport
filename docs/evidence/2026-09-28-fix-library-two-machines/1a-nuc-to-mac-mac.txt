@@ -1,0 +1,17 @@
+"PUNYBZ-NUC7I3BNHXF (FL NUC)"                    punybz-NUC7i3BNHXF-omt.local:6400  [172.16.80.73]
+connecting to PUNYBZ-NUC7I3BNHXF (FL NUC)
+connected (Video channel) to 172.16.80.73:6400
+metadata: <OMTInfo ProductName="omt" Manufacturer="open-media-transport" Version="0.1.0" />
+sender says: Tally(Tally { preview: false, program: false })
+connected (Audio channel) to 172.16.80.73:6400
+metadata: <OMTInfo ProductName="omt" Manufacturer="open-media-transport" Version="0.1.0" />
+sender says: Tally(Tally { preview: false, program: false })
+   1.0s  video 1280x720 30.00 fps | 28.3 fps received | 5.5 Mbit/s | audio 48000 Hz 2 ch, 3/30 frames with sound | decode errors 0
+   2.0s  video 1280x720 30.00 fps | 30.6 fps received | 6.0 Mbit/s | audio 48000 Hz 2 ch, 3/30 frames with sound | decode errors 0
+   3.1s  video 1280x720 30.00 fps | 30.3 fps received | 5.9 Mbit/s | audio 48000 Hz 2 ch, 3/31 frames with sound | decode errors 0
+   4.1s  video 1280x720 30.00 fps | 29.2 fps received | 5.7 Mbit/s | audio 48000 Hz 2 ch, 3/30 frames with sound | decode errors 0
+   5.1s  video 1280x720 30.00 fps | 26.6 fps received | 5.2 Mbit/s | audio 48000 Hz 2 ch, 3/28 frames with sound | decode errors 0
+   6.1s  video 1280x720 30.00 fps | 33.9 fps received | 6.6 Mbit/s | audio 48000 Hz 2 ch, 3/32 frames with sound | decode errors 0
+   7.1s  video 1280x720 30.00 fps | 21.0 fps received | 4.2 Mbit/s | audio 48000 Hz 2 ch, 3/25 frames with sound | decode errors 0
+saved 1280x720 snapshot to /tmp/fl-nuc-to-mac.png (8-bit PNG)
+/tmp/fl-nuc-to-mac.png: PNG image data, 1280 x 720, 8-bit/color RGB, non-interlaced

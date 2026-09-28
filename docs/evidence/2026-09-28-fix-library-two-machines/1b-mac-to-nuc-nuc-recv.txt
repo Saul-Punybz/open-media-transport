@@ -1,0 +1,15 @@
+connecting to SAULS-MACBOOK-PRO.LOCAL (FL Mac)
+connected (Video channel) to 172.16.80.64:6400
+metadata: <OMTInfo ProductName="omt" Manufacturer="open-media-transport" Version="0.1.0" />
+connected (Audio channel) to 172.16.80.64:6400
+sender says: Tally(Tally { preview: false, program: false })
+metadata: <OMTInfo ProductName="omt" Manufacturer="open-media-transport" Version="0.1.0" />
+sender says: Tally(Tally { preview: false, program: false })
+   1.0s  video 1280x720 30.00 fps | 23.7 fps received | 4.7 Mbit/s | audio 48000 Hz 2 ch, 3/24 frames with sound | decode errors 0
+   2.0s  video 1280x720 30.00 fps | 23.6 fps received | 4.6 Mbit/s | audio 48000 Hz 2 ch, 2/16 frames with sound | decode errors 0
+   3.0s  video 1280x720 30.00 fps | 33.8 fps received | 6.6 Mbit/s | audio 48000 Hz 2 ch, 3/24 frames with sound | decode errors 0
+   4.0s  video 1280x720 30.00 fps | 20.9 fps received | 3.9 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+   5.0s  video 1280x720 30.00 fps | 33.9 fps received | 6.9 Mbit/s | audio 48000 Hz 2 ch, 6/60 frames with sound | decode errors 0
+   6.1s  video 1280x720 30.00 fps | 31.6 fps received | 5.9 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+   7.1s  video 1280x720 30.00 fps | 32.2 fps received | 6.5 Mbit/s | audio 48000 Hz 2 ch, 6/36 frames with sound | decode errors 0
+saved 1280x720 snapshot to ./fl-mac-to-nuc.png (8-bit PNG)

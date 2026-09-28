@@ -1,0 +1,10 @@
+sending "PUNYBZ-NUC7I3BNHXF (FL Virtual)" on port 6400 — 640x360 at 30.00 fps. Ctrl-C to stop.
+redirecting receivers to SAULS-MACBOOK-PRO.LOCAL (FL Real)
+   5.0s  connections=3 video_receivers=1 tally= dropped=0
+  10.0s  connections=3 video_receivers=1 tally= dropped=0
+  15.0s  connections=1 video_receivers=0 tally= dropped=0
+  20.0s  connections=0 video_receivers=0 tally= dropped=0
+  25.1s  connections=3 video_receivers=1 tally= dropped=0
+  30.1s  connections=0 video_receivers=0 tally= dropped=0
+  35.1s  connections=0 video_receivers=0 tally= dropped=0
+  40.1s  connections=0 video_receivers=0 tally= dropped=0

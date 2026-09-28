@@ -1,0 +1,5 @@
+sending "PUNYBZ-NUC7I3BNHXF (FL NUC)" on port 6400 — 1280x720 at 30.00 fps. Ctrl-C to stop.
+   5.0s  connections=0 video_receivers=0 tally= dropped=0
+  10.0s  connections=2 video_receivers=1 tally= dropped=0
+  15.0s  connections=2 video_receivers=1 tally= dropped=0
+  20.0s  connections=0 video_receivers=0 tally= dropped=0

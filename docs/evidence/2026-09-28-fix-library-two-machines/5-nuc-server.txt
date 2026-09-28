@@ -1,0 +1,9 @@
+discovery server on port 6399. Ctrl-C to stop.
+Connected: [::ffff:172.16.80.64]:60703
+[::ffff:172.16.80.64]:60703 ADDED SAULS-MACBOOK-PRO.LOCAL (FL ViaServer) port 6400 [172.16.80.64]
+Connected: [::ffff:127.0.0.1]:44330
+Disconnected: [::ffff:127.0.0.1]:44330
+Connected: [::ffff:127.0.0.1]:44342
+Disconnected: [::ffff:127.0.0.1]:44342
+[::ffff:172.16.80.64]:60703 REMOVED SAULS-MACBOOK-PRO.LOCAL (FL ViaServer)
+Disconnected: [::ffff:172.16.80.64]:60703
