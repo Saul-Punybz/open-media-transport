@@ -1,0 +1,197 @@
+cargo :  Downloading crates ...
+At line:4 char:1
++ cargo test -p vmx-codec -p open-media-transport 2>&1 | Tee-Object $lo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( Downloading crates ...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Downloaded cc v1.4.7
+  Downloaded find-msvc-tools v0.1.13
+  Downloaded shlex v2.0.1
+   Compiling find-msvc-tools v0.1.13
+   Compiling shlex v2.0.1
+   Compiling windows-link v0.2.1
+   Compiling windows-sys v0.61.2
+   Compiling cc v1.4.7
+   Compiling libvmx-ref v0.0.0 (C:\Users\saulg\Projects\open-media-transport\crates\libvmx-ref)
+warning: libvmx-ref@0.0.0: libvmx sources not found at 
+C:\Users\saulg\Projects\open-media-transport\crates\libvmx-ref\../../reference/libvmx/src - conformance tests will be 
+skipped
+   Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling vmx-codec v0.1.0 (C:\Users\saulg\Projects\open-media-transport\crates\vmx-codec)
+   Compiling spin v0.9.9
+   Compiling socket2 v0.6.5
+   Compiling log v0.4.34
+   Compiling mio v1.2.3
+   Compiling socket-pktinfo v0.4.1
+   Compiling flume v0.12.0
+   Compiling if-addrs v0.15.0
+   Compiling memchr v2.8.3
+   Compiling fastrand v2.5.0
+   Compiling cfg-if v1.0.5
+   Compiling hostname v0.4.2
+   Compiling mdns-sd v0.21.4
+   Compiling roxmltree v0.21.1
+   Compiling open-media-transport v0.1.0 (C:\Users\saulg\Projects\open-media-transport\crates\open-media-transport)
+    Finished `test` profile [optimized + debuginfo] target(s) in 3m 18s
+     Running unittests src\lib.rs (target\debug\deps\open_media_transport-9995d3f44b871c92.exe)
+
+running 77 tests
+test address::tests::display_round_trips ... ok
+test address::tests::parses_names_and_urls ... ok
+test address::tests::urls_resolve_without_discovery ... ok
+test clock::tests::intervals_match_libomtnet_arithmetic ... ok
+test address::tests::names_follow_the_directory ... ok
+test command::tests::every_command_round_trips ... ok
+test command::tests::near_misses_are_not_commands ... ok
+test command::tests::no_command_carries_a_nul ... ok
+test command::tests::prefix_messages ... ok
+test command::tests::strings_match_libomtnet_exactly ... ok
+test command::tests::tally_union ... ok
+test deframer::tests::bad_version_is_an_error_not_a_stall ... ok
+test clock::tests::audio_interval ... ok
+test deframer::tests::many_frames_in_one_push ... ok
+test deframer::tests::corrupted_streams_never_panic ... ok
+test deframer::tests::splits_frames_fed_one_byte_at_a_time ... ok
+test discovery::tests::address_order ... ok
+test deframer::tests::oversized_frame_is_an_error_not_a_stall ... ok
+test discovery::tests::full_name_format_and_limit ... ok
+test discovery::tests::instance_names_are_unescaped ... ok
+test discovery::tests::interface_entries_are_names_or_addresses ... ok
+test discovery::tests::interface_selection_limits_announcements ... ignored, uses the network's mDNS
+test discovery::tests::srv_host_forms ... ok
+test discovery::tests::validity_and_split ... ok
+test discovery_server::tests::address_order_like_libomtnet ... ok
+test clock::tests::skips_ahead_when_late ... ok
+test discovery_server::tests::parsing_follows_libomtnet ... ok
+test discovery_server::tests::urls ... ok
+test discovery_server::tests::xml_round_trip ... ok
+test frame::tests::audio_header_layout ... ok
+test frame::tests::fourccs_match_libomtnet ... ok
+test frame::tests::frame_len_checks ... ok
+test frame::tests::header_layout ... ok
+test frame::tests::header_rejects_bad_version_and_type ... ok
+test frame::tests::video_header_layout ... ok
+test frame::tests::write_puts_metadata_last_and_counts_it ... ok
+test media::tests::audio_limits ... ok
+test media::tests::audio_reinserts_silent_channels ... ok
+test media::tests::bad_video_is_an_error_not_a_panic ... ok
+test media::tests::bgra_white_black_and_alpha ... ok
+test media::tests::metadata_passes_application_xml_and_sender_info_only ... ok
+test media::tests::previews_have_the_preview_size ... ok
+test media::tests::select_follows_libomtnet ... ok
+test media::tests::uyva_and_pa16_are_planes_back_to_back ... ok
+test media::tests::uyvy_and_p216_match_vmx_codec ... ok
+test discovery_server::tests::clients_find_each_other_through_the_server ... ok
+test clock::tests::stamps_and_paces ... ok
+test receiver::tests::audio_only_subscribes_metadata_on_the_audio_connection ... ok
+test receiver::tests::connects_by_url ... ok
+test net::tests::a_blocked_read_stops ... ok
+test receiver::tests::drop_is_bounded_with_a_stalled_sender ... ok
+test receiver::tests::metadata_only_sends_only_the_metadata_subscription ... ok
+test receiver::tests::opens_two_connections_with_libomtnet_sequences ... ok
+test discovery_server::tests::client_reregisters_after_server_restart_and_forgets_on_disconnect ... ok
+test redirect::tests::end_to_end::a_new_receiver_is_redirected_on_connect ... ok
+test redirect::tests::end_to_end::chains_are_forwarded_by_the_first_sender ... ok
+test redirect::tests::end_to_end::follows_moves_and_returns ... ok
+test receiver::tests::reconnects_and_resends_current_state ... ok
+test redirect::tests::end_to_end::redirect_to_self_is_none ... ok
+test redirect::tests::parse_variants ... ok
+test redirect::tests::parses_what_it_writes ... ok
+test redirect::tests::xml_form ... ok
+test sender::tests::bad_input_is_an_error_not_a_panic ... ok
+test receiver::tests::a_name_is_resolved_again_after_the_sender_moves ... ok
+test sender::tests::encoded_frames_are_forwarded_untouched ... ok
+test sender::tests::encoder_threads_do_not_change_the_bitstream ... ok
+test sender::tests::our_receiver_gets_video_audio_and_tally ... ok
+test sender::tests::outbox_limits ... ok
+test sender::tests::preview_connections_get_the_prefix_and_the_metadata ... ok
+test sender::tests::repeated_frames_do_not_grow ... ok
+test sender::tests::sender_info_xml_matches_capture ... ok
+test redirect::tests::end_to_end::no_redirect_message_on_connect_after_a_clear ... ok
+test sender::tests::senders_share_one_mdns_responder ... ignored, uses the network's mDNS
+test sender::tests::stats_count_frames_bytes_and_connections ... ok
+test sender::tests::senders_share_one_discovery ... ok
+test receiver::tests::drop_is_bounded_while_connecting ... ok
+test sender::tests::drop_is_bounded_with_a_stalled_receiver ... ok
+
+test result: ok. 75 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 4.37s
+
+     Running tests\captured.rs (target\debug\deps\captured-2a25c5d64d34b0a7.exe)
+
+running 4 tests
+test no_captured_command_carries_a_nul ... ok
+test receiver_audio_connection_is_byte_identical ... ok
+test receiver_video_connection_is_byte_identical ... ok
+test sender_accept_sequence_parses ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\media_libvmx.rs (target\debug\deps\media_libvmx-76ad091252d8cedc.exe)
+
+running 2 tests
+test bgra_matches_libvmx ... ok
+test previews_match_libvmx ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\media_loopback.rs (target\debug\deps\media_loopback-8e5878edddbec5e4.exe)
+
+running 4 tests
+test audio_and_metadata_round_trip ... ok
+test p216_round_trip_keeps_ten_bits ... ok
+test uyvy_round_trip ... ok
+test alpha_round_trips_as_uyva_bgra_and_pa16 ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running unittests src\lib.rs (target\debug\deps\vmx_codec-0c82f86f8fe6a574.exe)
+
+running 13 tests
+test bits::tests::code_mapping_roundtrip ... ok
+test bits::tests::run_and_value_codes ... ok
+test bits::tests::writer_matches_bitwise_reference ... ok
+test dct::tests::flat_block_roundtrip ... ok
+test bits::tests::combined_run_value_matches_separate_codes ... ok
+test bits::tests::ac_cursor_matches_bitwise_reader ... ok
+test dct::tests::reciprocal_of_16 ... ok
+test decoder::tests::preview_len_counts_extended_header_with_zero_shift ... ok
+test dct::tests::nonzero_mask_native_matches_scalar ... ok
+test layout::tests::interlaced_rows ... ok
+test layout::tests::quality_presets_match_libvmx ... ok
+test dct::tests::fdct_native_matches_scalar ... ok
+test dct::tests::idct_native_matches_scalar ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests\conformance.rs (target\debug\deps\conformance-005e9f1f8f5186ce.exe)
+
+running 9 tests
+test eight_bit_yuy2_and_alpha_match_libvmx ... ok
+test eight_bit_uyvy_matches_libvmx ... ok
+test four_two_zero_input_matches_libvmx ... ok
+test full_hd_matches_libvmx ... ok
+test interlaced_matches_libvmx ... ok
+test preview_matches_libvmx ... ok
+test ten_bit_matches_libvmx ... ok
+test rate_control_matches_libvmx ... ok
+test threaded_rust_is_deterministic ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests open_media_transport
+
+running 2 tests
+test crates\open-media-transport\src\media.rs - media (line 27) ... ok
+test crates\open-media-transport\src\lib.rs - (line 31) ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.05s
+
+   Doc-tests vmx_codec
+
+running 2 tests
+test crates\vmx-codec\src\encoder.rs - encoder::Encoder (line 93) ... ok
+test crates\vmx-codec\src\lib.rs - (line 26) ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.04s

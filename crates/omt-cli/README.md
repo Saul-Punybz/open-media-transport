@@ -5,7 +5,7 @@ built on the [`open-media-transport`](../open-media-transport) crate.
 
 ```text
 omt list [--seconds N]                                   show sources on the network
-omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--10bit]   send a test pattern
+omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--10bit] [--threads N]   send a test pattern
 omt recv SOURCE [--seconds N] [--snapshot FILE.bmp|FILE.png] [--preview]   receive and report
 omt discovery-server [--port N] [--seconds N]           run a discovery server
 omt version
@@ -17,6 +17,11 @@ omt version
 second, and can save the last frame: `.png` keeps a 10-bit source at 16 bits per sample (and
 keeps alpha), `.bmp` is 8-bit RGB. `send --10bit` sends a 10-bit (P216) source whose grey
 ramp covers every 10-bit level, to test that path end to end.
+
+`send` encodes on one thread by default. If the machine cannot encode at the requested rate,
+`send` prints a warning with the rate it reaches (video and audio then fall behind real time);
+`--threads N` gives the encoder more threads. Unknown options are an error, and `--help` prints
+the usage.
 
 On networks without multicast, run `omt discovery-server` on one machine (port 6399 by
 default) and pass `--discovery-server omt://HOST[:PORT]` to `list`, `send` and `recv`.

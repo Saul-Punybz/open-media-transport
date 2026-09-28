@@ -1,0 +1,33 @@
+==== 1080p59.94_t1
+sending "DESKTOP-QRLFQ6I (Test Pattern)" on port 6400 — 1920x1080 at 59.94 fps. Ctrl-C to stop.
+warning: sending 56.3 fps of the requested 59.94; video and audio are falling behind real time (try --threads 2 or a smaller --size)
+   5.1s  connections=0 video_receivers=0 tally= dropped=0
+warning: sending 53.7 fps of the requested 59.94; video and audio are falling behind real time (try --threads 2 or a smaller --size)
+  10.2s  connections=0 video_receivers=0 tally= dropped=0
+warning: sending 56.6 fps of the requested 59.94; video and audio are falling behind real time (try --threads 2 or a smaller --size)
+  15.2s  connections=0 video_receivers=0 tally= dropped=0
+==== 1080p59.94_t2
+sending "DESKTOP-QRLFQ6I (Test Pattern)" on port 6400 — 1920x1080 at 59.94 fps. Ctrl-C to stop.
+   5.0s  connections=0 video_receivers=0 tally= dropped=0
+  10.1s  connections=0 video_receivers=0 tally= dropped=0
+  15.1s  connections=0 video_receivers=0 tally= dropped=0
+==== 2160p30_t1
+sending "DESKTOP-QRLFQ6I (Test Pattern)" on port 6400 — 3840x2160 at 30.00 fps. Ctrl-C to stop.
+warning: sending 14.5 fps of the requested 30.00; video and audio are falling behind real time (try --threads 2 or a smaller --size)
+   5.1s  connections=0 video_receivers=0 tally= dropped=0
+warning: sending 14.5 fps of the requested 30.00; video and audio are falling behind real time (try --threads 2 or a smaller --size)
+  10.2s  connections=0 video_receivers=0 tally= dropped=0
+warning: sending 14.7 fps of the requested 30.00; video and audio are falling behind real time (try --threads 2 or a smaller --size)
+  15.2s  connections=0 video_receivers=0 tally= dropped=0
+==== 2160p30_t4
+sending "DESKTOP-QRLFQ6I (Test Pattern)" on port 6400 — 3840x2160 at 30.00 fps. Ctrl-C to stop.
+warning: sending 21.1 fps of the requested 30.00; video and audio are falling behind real time (try --threads 5 or a smaller --size)
+   5.1s  connections=0 video_receivers=0 tally= dropped=0
+warning: sending 21.5 fps of the requested 30.00; video and audio are falling behind real time (try --threads 5 or a smaller --size)
+  10.1s  connections=0 video_receivers=0 tally= dropped=0
+warning: sending 21.5 fps of the requested 30.00; video and audio are falling behind real time (try --threads 5 or a smaller --size)
+  15.2s  connections=0 video_receivers=0 tally= dropped=0
+==== t4b
+sending "DESKTOP-QRLFQ6I (Test Pattern)" on port 6400 — 3840x2160 at 30.00 fps. Ctrl-C to stop.
+warning: sending 20.7 fps of the requested 30.00; video and audio are falling behind real time (try a smaller --size or a lower --fps)
+   5.0s  connections=0 video_receivers=0 tally= dropped=0

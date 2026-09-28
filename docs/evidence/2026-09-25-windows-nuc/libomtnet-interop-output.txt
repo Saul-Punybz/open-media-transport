@@ -1,0 +1,81 @@
+==== A: libomtnet-harness list 8 (omt send "Rust Test" running)
+list "DESKTOP-QRLFQ6I (Rust Test)"
+==== B: libomtnet-harness recv "DESKTOP-QRLFQ6I (Rust Test)" 10 : stdout
+recv metadata ts=0 len=82 xml="<OMTInfo ProductName=\x22omt\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1.0\x22 />\x00"
+recv metadata ts=0 len=82 xml="<OMTInfo ProductName=\x22omt\x22 Manufacturer=\x22open-media-transport\x22 Version=\x220.1.0\x22 />\x00"
+recv video ts=34999965 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27175 meta=""
+recv audio ts=34999965 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=44999955 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27303 meta=""
+recv audio ts=44999955 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=54999945 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27175 meta=""
+recv audio ts=54999945 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=64999935 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27303 meta=""
+recv audio ts=64999935 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=74999925 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27175 meta=""
+recv audio ts=74999925 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=84999915 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27303 meta=""
+recv audio ts=84999915 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=94999905 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27175 meta=""
+recv audio ts=94999905 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=104999895 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27303 meta=""
+recv audio ts=104999895 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=114999885 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27175 meta=""
+recv audio ts=114999885 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv video ts=124999875 1280x720 codec=UYVY flags=0 cs=709 rate=30/1 compressed=27303 meta=""
+recv audio ts=124999875 rate=48000 ch=2 spc=1600 len=12800 fnv1a64=79e6435029510b25
+recv done video=300 audio=299 info=omt/open-media-transport/0.1.0
+==== B: stderr (libomtnet log)
+log: 9/25/2026 8:15:16 AM,[OMTLogging],Log Started
+log: 9/25/2026 8:15:16 AM,[OMTDiscoveryWin32],BeginDNSBrowse.OK
+log: 9/25/2026 8:15:16 AM,[OMTDiscovery],New: DESKTOP-QRLFQ6I (Rust Test):6400
+log: 9/25/2026 8:15:16 AM,[OMTDiscovery],AddIP: DESKTOP-QRLFQ6I (Rust Test):6400,172.16.80.58
+log: 9/25/2026 8:15:17 AM,[OMTDiscoveryWin32],System.Net.NetworkInformation.NetworkInformationException (10043): The requested protocol has not been configured into the system, or no implementation for it exists.
+   at System.Net.NetworkInformation.SystemIPInterfaceProperties.GetIPv4Properties()
+   at libomtnet.src.mdns.MDNSClient.CreateMulticastSockets() in C:\Users\saulg\Projects\open-media-transport\reference\libomtnet\src\mdns\MDNSClient.cs:line 91
+   at libomtnet.src.mdns.MDNSClient..ctor(String serviceType) in C:\Users\saulg\Projects\open-media-transport\reference\libomtnet\src\mdns\MDNSClient.cs:line 61
+   at libomtnet.win32.OMTDiscoveryWin32.BeginDNSClient() in C:\Users\saulg\Projects\open-media-transport\reference\libomtnet\src\win32\OMTDiscoveryWin32.cs:line 122
+log: 9/25/2026 8:15:17 AM,[OMTReceive.BeginConnect],ConnectingVideo: DESKTOP-QRLFQ6I (Rust Test):6400
+log: 9/25/2026 8:15:17 AM,[OMTReceive.BeginConnect],ConnectingAudio: DESKTOP-QRLFQ6I (Rust Test):6400
+log: 9/25/2026 8:15:17 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/25/2026 8:15:17 AM,[OMTReceive.Connect],Connected.Video: DESKTOP-QRLFQ6I (Rust Test)
+log: 9/25/2026 8:15:17 AM,[OMTChannel],KeepAlive.Enabled
+log: 9/25/2026 8:15:17 AM,[OMTReceive.Connect],Connected.Audio: DESKTOP-QRLFQ6I (Rust Test)
+log: 9/25/2026 8:15:27 AM,[OMTDiscoveryWin32],EndDNSBrowse
+==== C: libomtnet-harness send Harness 35 : stdout
+send address=DESKTOP-QRLFQ6I (Harness) url=omt://DESKTOP-QRLFQ6I:6400 port=6400
+send done connections=0
+==== C: omt list --seconds 8
+"DESKTOP-QRLFQ6I (Harness)"                      DESKTOP-QRLFQ6I.local:6400  [172.16.80.58]
+==== C: omt recv "DESKTOP-QRLFQ6I (Harness)" --seconds 12 --snapshot
+connecting to DESKTOP-QRLFQ6I (Harness)
+connected (Video channel) to 172.16.80.58:6400
+connected (Audio channel) to 172.16.80.58:6400
+metadata: <OMTInfo ProductName="omt-harness" Manufacturer="open-media-transport" Version="0.1" />
+metadata: <HarnessHello Value="1" />
+sender says: Tally(Tally { preview: false, program: false })
+metadata: <OMTInfo ProductName="omt-harness" Manufacturer="open-media-transport" Version="0.1" />
+metadata: <HarnessHello Value="1" />
+sender says: Tally(Tally { preview: false, program: false })
+   1.0s  video 640x360 30.00 fps | 29.1 fps received | 14.8 Mbit/s | audio 48000 Hz 2 ch, 30/30 frames with sound | decode errors 0
+   2.1s  video 640x360 30.00 fps | 30.2 fps received | 15.6 Mbit/s | audio 48000 Hz 2 ch, 31/31 frames with sound | decode errors 0
+   3.1s  video 640x360 30.00 fps | 29.6 fps received | 15.8 Mbit/s | audio 48000 Hz 2 ch, 30/30 frames with sound | decode errors 0
+   4.1s  video 640x360 30.00 fps | 30.0 fps received | 16.0 Mbit/s | audio 48000 Hz 2 ch, 31/31 frames with sound | decode errors 0
+   5.1s  video 640x360 30.00 fps | 30.3 fps received | 16.2 Mbit/s | audio 48000 Hz 2 ch, 31/31 frames with sound | decode errors 0
+   6.2s  video 640x360 30.00 fps | 29.7 fps received | 15.2 Mbit/s | audio 48000 Hz 2 ch, 31/31 frames with sound | decode errors 0
+   7.2s  video 640x360 30.00 fps | 30.4 fps received | 15.5 Mbit/s | audio 48000 Hz 2 ch, 31/31 frames with sound | decode errors 0
+   8.2s  video 640x360 30.00 fps | 29.7 fps received | 15.0 Mbit/s | audio 48000 Hz 2 ch, 30/30 frames with sound | decode errors 0
+   9.2s  video 640x360 30.00 fps | 30.3 fps received | 15.4 Mbit/s | audio 48000 Hz 2 ch, 31/31 frames with sound | decode errors 0
+  10.2s  video 640x360 30.00 fps | 29.6 fps received | 15.1 Mbit/s | audio 48000 Hz 2 ch, 30/30 frames with sound | decode errors 0
+  11.3s  video 640x360 30.00 fps | 30.3 fps received | 16.0 Mbit/s | audio 48000 Hz 2 ch, 31/31 frames with sound | decode errors 0
+saved 640x360 snapshot to C:\Users\saulg\AppData\Local\Temp\claude\C--Users-saulg\5f77249a-d7e9-462f-8655-b538b5c696a9\scratchpad\omt\interop\run\C-shot.png (8-bit PNG)
+==== omt send "Rust Test" during A/B (first run)
+sending "DESKTOP-QRLFQ6I (Rust Test)" on port 6400 — 1280x720 at 30.00 fps. Ctrl-C to stop.
+   5.0s  connections=0 video_receivers=0 tally= dropped=0
+  10.0s  connections=0 video_receivers=0 tally= dropped=0
+  13.7s  connections=2 video_receivers=1 tally=PGM dropped=0
+  15.4s  connections=0 video_receivers=0 tally= dropped=0
+  20.4s  connections=0 video_receivers=0 tally= dropped=0
+  25.5s  connections=0 video_receivers=0 tally= dropped=0
+  30.5s  connections=0 video_receivers=0 tally= dropped=0
+  35.5s  connections=0 video_receivers=0 tally= dropped=0
+  40.6s  connections=0 video_receivers=0 tally= dropped=0
