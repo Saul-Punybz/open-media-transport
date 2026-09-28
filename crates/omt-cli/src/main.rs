@@ -4,6 +4,7 @@
 //! omt list [--seconds N]
 //! omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE] [--10bit]
 //! omt recv SOURCE [--seconds N] [--snapshot FILE.bmp|FILE.png] [--preview]
+//! omt check SOURCE [--seconds N] [--json]
 //! omt discovery-server [--port N] [--seconds N]
 //! ```
 //!
@@ -29,7 +30,9 @@ use open_media_transport::command::{classify, Message, Quality};
 use open_media_transport::discovery::{Discovery, SourceEvent};
 use open_media_transport::discovery_server::{self, Server, ServerEvent};
 use open_media_transport::frame::{ExtendedHeader, VideoFlags};
-use open_media_transport::media::{MediaDecoder, PreferredVideoFormat, VideoFrame};
+use open_media_transport::media::{
+    decode_audio, AudioFrame, MediaDecoder, PreferredVideoFormat, VideoFrame,
+};
 use open_media_transport::receiver::{Event, Receiver, ReceiverConfig};
 use open_media_transport::sender::{Sender, SenderConfig, SenderInfo, VideoParams};
 use vmx_codec::{Frame, PixelFormat};
@@ -50,6 +53,12 @@ USAGE:
       host:port), print statistics every second, and optionally save the
       last frame: .png keeps 10-bit sources at 16 bits per sample and keeps
       alpha; .bmp is 8-bit RGB. Follows redirects.
+  omt check SOURCE [--seconds N] [--json]
+      Connect to SOURCE, watch it for a few seconds (default 5), and report its
+      health: does it connect, how many frames per second arrive versus what it
+      claims, do frames decode, and is the picture black or frozen or the audio
+      silent. Prints OK / WARN / FAIL and exits 0 / 1 / 2 (--json for a machine
+      -readable report). The first thing to run against any OMT source.
   omt discovery-server [--port N] [--seconds N]
       Run a discovery server for networks without multicast (default port
       6399), printing each client and source as it comes and goes.
@@ -66,6 +75,7 @@ fn main() -> ExitCode {
         Some("list") => list(&args[1..]),
         Some("send") => send(&args[1..]),
         Some("recv") => recv(&args[1..]),
+        Some("check") => check(&args[1..]),
         Some("discovery-server") => serve_discovery(&args[1..]),
         Some("version" | "--version" | "-V") => {
             println!("omt {}", env!("CARGO_PKG_VERSION"));
@@ -452,6 +462,231 @@ fn recv(args: &[String]) -> Result<()> {
         println!("saved {w}x{h} snapshot to {path} ({depth})");
     }
     Ok(())
+}
+
+/// `omt check SOURCE`: connect, watch the source for a few seconds, and report
+/// whether it is healthy. Prints OK / WARN / FAIL and exits 0 / 1 / 2 so it can
+/// gate a test script; `--json` prints the same findings machine-readably.
+fn check(args: &[String]) -> Result<()> {
+    let source = args
+        .first()
+        .filter(|a| !a.starts_with("--"))
+        .ok_or("check needs a SOURCE (see `omt list`)")?;
+    let secs = seconds(args)?.unwrap_or(5).max(1);
+    let json = args.iter().any(|a| a == "--json");
+    if !json {
+        println!("checking {source} for {secs}s…");
+    }
+    let rx = connect(
+        source,
+        ReceiverConfig {
+            quality: Quality::Default,
+            ..ReceiverConfig::default()
+        },
+        args,
+    )?;
+
+    let start = Instant::now();
+    let limit = Duration::from_secs(secs);
+    let mut decoder = MediaDecoder::new(PreferredVideoFormat::UyvyOrUyvaOrP216OrPa16);
+    let mut vframe = VideoFrame::default();
+    let mut aframe = AudioFrame::default();
+
+    let mut connected = false;
+    let mut video_frames = 0u64;
+    let mut audio_frames = 0u64;
+    let mut decode_errors = 0u64;
+    let (mut width, mut height, mut declared_fps) = (0i32, 0i32, 0.0f64);
+    let (mut sample_rate, mut channels) = (0i32, 0i32);
+
+    // A handful of decoded frames a second are analysed, not every frame: enough
+    // to catch black or frozen video without decoding the whole stream.
+    let mut sampled = 0u64;
+    let mut black_samples = 0u64;
+    let mut min_brightness = f32::INFINITY;
+    let mut last_hash: Option<u64> = None;
+    let mut identical_run = 0u64; // consecutive sampled frames identical to the previous
+    let mut decode_due = true;
+    let mut sample_tick = Instant::now();
+    let mut peak_rms = 0.0f32;
+
+    while start.elapsed() < limit {
+        if let Some(event) = rx.recv_timeout(Duration::from_millis(100)) {
+            match event {
+                Event::Connected(_) => connected = true,
+                Event::Frame(_, f) => match f.ext {
+                    ExtendedHeader::Video(v) => {
+                        connected = true;
+                        video_frames += 1;
+                        width = v.width;
+                        height = v.height;
+                        declared_fps = v.frame_rate_n as f64 / v.frame_rate_d.max(1) as f64;
+                        if decode_due {
+                            decode_due = false;
+                            match decoder.decode_video(&f, &mut vframe) {
+                                Ok(()) => {
+                                    let rgb = image::to_rgb(&vframe);
+                                    let ch = if rgb.alpha { 4 } else { 3 };
+                                    let px = rgb.width * rgb.height;
+                                    let mut sum = 0.0f64;
+                                    let mut hash = 0xcbf29ce484222325u64;
+                                    for p in 0..px {
+                                        let b = p * ch;
+                                        let luma = (rgb.samples[b]
+                                            + rgb.samples[b + 1]
+                                            + rgb.samples[b + 2])
+                                            / 3.0;
+                                        sum += luma as f64;
+                                        hash = (hash ^ luma.to_bits() as u64)
+                                            .wrapping_mul(0x100000001b3);
+                                    }
+                                    let brightness = (sum / px.max(1) as f64) as f32;
+                                    min_brightness = min_brightness.min(brightness);
+                                    if brightness < 0.02 {
+                                        black_samples += 1;
+                                    }
+                                    if Some(hash) == last_hash {
+                                        identical_run += 1;
+                                    } else {
+                                        identical_run = 0;
+                                    }
+                                    last_hash = Some(hash);
+                                    sampled += 1;
+                                }
+                                Err(_) => decode_errors += 1,
+                            }
+                        }
+                    }
+                    ExtendedHeader::Audio(a) => {
+                        connected = true;
+                        audio_frames += 1;
+                        sample_rate = a.sample_rate;
+                        channels = a.channels;
+                        if decode_audio(&f, &mut aframe).is_ok() && !aframe.samples.is_empty() {
+                            let ss: f64 =
+                                aframe.samples.iter().map(|s| *s as f64 * *s as f64).sum();
+                            let rms = (ss / aframe.samples.len() as f64).sqrt() as f32;
+                            peak_rms = peak_rms.max(rms);
+                        }
+                    }
+                    ExtendedHeader::None => {}
+                },
+                _ => {}
+            }
+        }
+        if sample_tick.elapsed() >= Duration::from_millis(250) {
+            decode_due = true;
+            sample_tick = Instant::now();
+        }
+    }
+
+    let elapsed = start.elapsed().as_secs_f64();
+    let recv_fps = video_frames as f64 / elapsed;
+    let has_video = video_frames > 0;
+    let has_audio = audio_frames > 0;
+    // Every sampled frame identical to the one before it (the box in our own test
+    // pattern moves, so a healthy source is never flagged over a few seconds).
+    let frozen = sampled >= 3 && identical_run + 1 >= sampled;
+    let all_black = sampled > 0 && black_samples == sampled;
+    let silent = has_audio && peak_rms < 1e-4;
+
+    let mut fails: Vec<String> = Vec::new();
+    let mut warns: Vec<String> = Vec::new();
+    if !connected || !has_video {
+        fails.push("no video frames received".into());
+    }
+    if decode_errors > 0 {
+        fails.push(format!("{decode_errors} frame(s) failed to decode"));
+    }
+    if has_video && declared_fps > 0.0 && recv_fps < declared_fps * 0.8 {
+        warns.push(format!(
+            "receiving {recv_fps:.1} fps, well below the source's {declared_fps:.2}"
+        ));
+    }
+    if all_black {
+        warns.push("every sampled frame is black".into());
+    }
+    if frozen {
+        warns.push("video looks frozen (sampled frames are identical)".into());
+    }
+    if silent {
+        warns.push("audio is present but silent the whole time".into());
+    }
+
+    let verdict = if !fails.is_empty() {
+        "FAIL"
+    } else if !warns.is_empty() {
+        "WARN"
+    } else {
+        "OK"
+    };
+
+    if json {
+        let esc = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
+        let list = |v: &[String]| {
+            v.iter()
+                .map(|s| format!("\"{}\"", esc(s)))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        println!("{{");
+        println!("  \"verdict\": \"{verdict}\",");
+        println!("  \"source\": \"{}\",", esc(source));
+        println!("  \"seconds\": {secs},");
+        println!("  \"connected\": {connected},");
+        println!("  \"video_frames\": {video_frames},");
+        println!("  \"received_fps\": {recv_fps:.2},");
+        println!("  \"declared_fps\": {declared_fps:.2},");
+        println!("  \"width\": {width},");
+        println!("  \"height\": {height},");
+        println!("  \"decode_errors\": {decode_errors},");
+        println!("  \"audio_frames\": {audio_frames},");
+        println!("  \"sample_rate\": {sample_rate},");
+        println!("  \"channels\": {channels},");
+        println!("  \"peak_rms\": {peak_rms:.6},");
+        println!(
+            "  \"min_brightness\": {:.4},",
+            if min_brightness.is_finite() {
+                min_brightness
+            } else {
+                0.0
+            }
+        );
+        println!("  \"black\": {all_black},");
+        println!("  \"frozen\": {frozen},");
+        println!("  \"silent\": {silent},");
+        println!("  \"warnings\": [{}],", list(&warns));
+        println!("  \"failures\": [{}]", list(&fails));
+        println!("}}");
+    } else {
+        if has_video {
+            println!(
+                "  video: {width}x{height}, {recv_fps:.1} fps received (source says {declared_fps:.2}), {decode_errors} decode error(s)"
+            );
+        } else {
+            println!("  video: none");
+        }
+        if has_audio {
+            println!("  audio: {sample_rate} Hz {channels} ch, peak level {peak_rms:.4}");
+        } else {
+            println!("  audio: none");
+        }
+        for w in &warns {
+            println!("  ! {w}");
+        }
+        for f in &fails {
+            println!("  ✗ {f}");
+        }
+        println!("{verdict}");
+    }
+
+    std::io::stdout().flush().ok();
+    let code = match verdict {
+        "FAIL" => 2,
+        "WARN" => 1,
+        _ => return Ok(()),
+    };
+    std::process::exit(code);
 }
 
 fn serve_discovery(args: &[String]) -> Result<()> {
