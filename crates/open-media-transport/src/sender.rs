@@ -201,6 +201,14 @@ pub struct SenderConfig {
     /// count from the frame size (`vmxcodec.cpp:280-312`) and libomtnet
     /// doubles it above 60 fps (`codecs/OMTVMX1Codec.cs:107-113`).
     pub encoder_threads: usize,
+    /// Most receiver connections to hold at once. Each connection runs two
+    /// threads, so without a cap a flood of connections (500 idle sockets made
+    /// 1,002 threads in testing) exhausts the host. Connections past this are
+    /// refused. Default 64.
+    pub max_connections: usize,
+    /// Most connections to hold from any one address, so a single peer cannot
+    /// use the whole budget. Default 8.
+    pub max_connections_per_ip: usize,
 }
 
 impl SenderConfig {
@@ -216,6 +224,8 @@ impl SenderConfig {
             ports: DEFAULT_PORTS,
             discovery: None,
             encoder_threads: 1,
+            max_connections: 64,
+            max_connections_per_ip: 8,
         }
     }
 }
@@ -345,6 +355,8 @@ impl Sender {
             redirect: Mutex::new(RedirectState::default()),
             self_names,
             peers: Mutex::new(Vec::new()),
+            max_connections: config.max_connections.max(1),
+            max_connections_per_ip: config.max_connections_per_ip.max(1),
             on_connect,
             quality: config.quality,
             tally: Mutex::new(Tally::default()),
@@ -907,6 +919,9 @@ struct Shared {
     /// Our full name and URL (X4).
     self_names: Vec<String>,
     peers: Mutex<Vec<Arc<Peer>>>,
+    /// Most connections to hold at once, and most from any one address.
+    max_connections: usize,
+    max_connections_per_ip: usize,
     on_connect: Vec<Vec<u8>>,
     quality: Quality,
     tally: Mutex<Tally>,
@@ -1168,6 +1183,21 @@ fn start_peer(stream: TcpStream, id: u64, shared: &Arc<Shared>) -> io::Result<()
     stream.set_nodelay(true)?; // T3
     crate::net::stoppable(&stream)?;
     let addr = stream.peer_addr()?;
+    // Refuse the connection if it would exceed the total or per-IP cap, before
+    // spawning its two threads, so a flood of connections cannot exhaust the
+    // host (§ security). Only the accept thread adds peers, so this count is
+    // stable between the check and the push below.
+    {
+        let peers = shared.peers.lock().unwrap();
+        if peers.len() >= shared.max_connections {
+            return Err(io::Error::other("sender connection cap reached"));
+        }
+        if peers.iter().filter(|p| p.addr.ip() == addr.ip()).count()
+            >= shared.max_connections_per_ip
+        {
+            return Err(io::Error::other("sender per-IP connection cap reached"));
+        }
+    }
     let peer = Arc::new(Peer {
         id,
         addr,
@@ -1343,6 +1373,34 @@ mod tests {
             assert!(Instant::now() < deadline, "timed out");
             std::thread::sleep(Duration::from_millis(10));
         }
+    }
+
+    #[test]
+    fn the_sender_caps_connections() {
+        let sender = Sender::new(SenderConfig {
+            ports: 18100..=18300,
+            max_connections: 3,
+            max_connections_per_ip: 2,
+            ..quiet("caps")
+        })
+        .unwrap();
+        let addr: SocketAddr = format!("127.0.0.1:{}", sender.port()).parse().unwrap();
+        // Hold ten connections open from this host at once; each would spawn two
+        // sender threads if admitted.
+        let mut conns = Vec::new();
+        for _ in 0..10 {
+            if let Ok(s) = TcpStream::connect(addr) {
+                conns.push(s);
+            }
+        }
+        wait_for(|| sender.peer_stats().len() >= 2);
+        std::thread::sleep(Duration::from_millis(100));
+        let held = sender.peer_stats().len();
+        assert!(
+            held <= 2,
+            "sender held {held} connections; the per-IP cap is 2"
+        );
+        drop(conns);
     }
 
     #[test]
