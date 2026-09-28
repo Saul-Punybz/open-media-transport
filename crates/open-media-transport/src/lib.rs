@@ -58,6 +58,7 @@ mod net;
 pub mod receiver;
 pub mod redirect;
 pub mod sender;
+pub mod settings;
 
 pub use deframer::{Deframer, Limits, OwnedFrame};
 

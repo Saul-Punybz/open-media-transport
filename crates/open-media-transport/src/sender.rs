@@ -247,6 +247,18 @@ impl SenderConfig {
             max_connections_per_ip: DEFAULT_MAX_CONNECTIONS_PER_IP,
         }
     }
+
+    /// [`SenderConfig::new`] with the port range and discovery server of
+    /// libomtnet's `settings.xml` ([`crate::settings`]), as every libomtnet
+    /// sender uses (`OMTSend.cs:100-101`, `OMTDiscovery.cs:56-60`).
+    pub fn from_settings(name: impl Into<String>) -> Self {
+        let s = crate::settings::Settings::load();
+        SenderConfig {
+            ports: s.ports(),
+            discovery_server: s.discovery_server,
+            ..SenderConfig::new(name)
+        }
+    }
 }
 
 /// Video frame properties that travel in the header (§3.3).
