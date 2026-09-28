@@ -509,7 +509,8 @@ impl Receiver {
         &self.inner.original
     }
 
-    /// The redirect being followed, if any (§9).
+    /// The redirect in force, if any (§9). With a [`RedirectPolicy`] that
+    /// refuses it, the receiver is still on the original sender.
     pub fn redirect(&self) -> Option<String> {
         self.inner.ctl.lock().unwrap().redirect.clone()
     }
@@ -625,6 +626,21 @@ impl Inner {
             }
             _ => target.resolve(None),
         }
+    }
+
+    /// Whether the redirect being followed resolves now, without waiting,
+    /// only to addresses the policy refuses, so the receiver would stay where
+    /// it is. A target not found yet is not refused: connecting will tell.
+    fn refused_now(&self) -> bool {
+        let Ok((target, true)) = self.target() else {
+            return false;
+        };
+        let Ok(addrs) = self.resolve(&target, None) else {
+            return false;
+        };
+        let policy = self.config.lock().unwrap().redirects;
+        let origin = self.conns.lock().unwrap().origin;
+        addrs.iter().all(|a| !policy.allows(origin, a.ip()))
     }
 
     /// Opens every connection the config asks for, with its §4.3 sequence,
@@ -840,6 +856,10 @@ impl Inner {
             };
             if want_side {
                 self.start_side();
+            }
+            if retarget && self.connected() && self.refused_now() {
+                // Staying with the original sender: no need to drop it.
+                continue;
             }
             let reconnect = self.config.lock().unwrap().reconnect;
             let due = last_attempt.elapsed() >= RETRY_INTERVAL;

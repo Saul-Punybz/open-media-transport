@@ -341,7 +341,11 @@ mod tests {
             a.set_redirect(Some(&elsewhere));
             std::thread::sleep(Duration::from_millis(1500));
             assert_eq!(b.video_receivers(), 0, "not followed");
-            wait_for("still on a", || on(&rx, &a));
+            assert!(on(&rx, &a), "still on a");
+            assert_eq!(rx.stats().reconnects, 0, "never left a");
+            let closed = std::iter::from_fn(|| rx.recv_timeout(Duration::from_millis(50)))
+                .any(|e| matches!(e, Event::Closed(..)));
+            assert!(!closed, "the connections to a stayed open");
 
             // The same redirect with `Any` is followed, as by libomtnet.
             let any = receiver_with(&a, RedirectPolicy::Any);
