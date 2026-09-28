@@ -19,6 +19,16 @@
 //! - can forward a frame that is already VMX1-compressed without touching it
 //!   (V2, P4, [`Sender::send_encoded_video`]).
 //!
+//! **Limits.** libomtnet accepts any number of connections and keeps one
+//! that never subscribes forever (`OMTSend.cs:353-395`). Here a sender
+//! accepts at most [`SenderConfig::max_connections`] connections, and
+//! [`SenderConfig::max_connections_per_ip`] from one address, closing the
+//! rest at once, and closes a connection that has not subscribed to
+//! anything after [`SUBSCRIBE_TIMEOUT`]; each connection costs two threads.
+//! A libomtnet receiver subscribes as soon as it connects (§4.3), so neither
+//! limit changes what a well-behaved receiver sees. [`SenderConfig::bind`]
+//! listens on one address instead of all of them.
+//!
 //! Many senders can share one [`Discovery`] ([`SenderConfig::discovery`]),
 //! so a process with many sources runs a single mDNS responder.
 //!
@@ -37,7 +47,7 @@
 
 use std::collections::VecDeque;
 use std::io::{self, Write};
-use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::ops::RangeInclusive;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex, Weak};
@@ -71,6 +81,14 @@ pub const MAX_AUDIO_DATA_LEN: usize = 1_048_576;
 /// How long dropping a [`Sender`] or a [`crate::receiver::Receiver`] waits
 /// for its threads after shutting its sockets down.
 pub const DROP_TIMEOUT: Duration = Duration::from_secs(2);
+/// Default for [`SenderConfig::max_connections`]: 128 receivers, each with
+/// its video and audio connection.
+pub const DEFAULT_MAX_CONNECTIONS: usize = 256;
+/// Default for [`SenderConfig::max_connections_per_ip`].
+pub const DEFAULT_MAX_CONNECTIONS_PER_IP: usize = 64;
+/// A connection that has not subscribed to video, audio or metadata by
+/// then is closed.
+pub const SUBSCRIBE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Why a frame could not be sent. Frames that are valid but cannot be queued
 /// (a full queue, a frame over [`MAX_FRAME_LEN`]) are not errors: they are
@@ -201,6 +219,14 @@ pub struct SenderConfig {
     /// count from the frame size (`vmxcodec.cpp:280-312`) and libomtnet
     /// doubles it above 60 fps (`codecs/OMTVMX1Codec.cs:107-113`).
     pub encoder_threads: usize,
+    /// Listen on this address only. `None`, the default, listens on every
+    /// interface over IPv6 and IPv4, as libomtnet does (T1).
+    pub bind: Option<IpAddr>,
+    /// Connections accepted at once; more are closed as they arrive.
+    /// libomtnet has no limit.
+    pub max_connections: usize,
+    /// Connections accepted at once from one IP address.
+    pub max_connections_per_ip: usize,
 }
 
 impl SenderConfig {
@@ -216,6 +242,9 @@ impl SenderConfig {
             ports: DEFAULT_PORTS,
             discovery: None,
             encoder_threads: 1,
+            bind: None,
+            max_connections: DEFAULT_MAX_CONNECTIONS,
+            max_connections_per_ip: DEFAULT_MAX_CONNECTIONS_PER_IP,
         }
     }
 }
@@ -313,6 +342,9 @@ pub struct Sender {
     full_name: Option<String>,
     discovery: Option<Arc<Discovery>>,
     accept: Option<JoinHandle<()>>,
+    /// Dropping the sender half stops the janitor.
+    janitor: Option<(mpsc::Sender<()>, JoinHandle<()>)>,
+    bind: Option<IpAddr>,
     encoder_threads: usize,
     video: Mutex<VideoState>,
     metadata_rx: Mutex<mpsc::Receiver<(SocketAddr, Vec<u8>)>>,
@@ -327,7 +359,7 @@ struct VideoState {
 impl Sender {
     /// Binds a port, starts accepting receivers and, if configured, announces.
     pub fn new(config: SenderConfig) -> io::Result<Sender> {
-        let (listener, port) = bind_first_free(config.ports.clone())?;
+        let (listener, port) = bind_first_free(config.bind, config.ports.clone())?;
         let mut on_connect = Vec::new();
         if let Some(info) = &config.info {
             on_connect.push(info.to_xml().into_bytes());
@@ -352,7 +384,15 @@ impl Sender {
             closing: AtomicBool::new(false),
             counts: Default::default(),
             bytes_sent: AtomicU64::new(0),
+            max_connections: config.max_connections,
+            max_connections_per_ip: config.max_connections_per_ip,
         });
+        // Returning early drops `janitor_stop`, which ends the janitor.
+        let (janitor_stop, stopped) = mpsc::channel::<()>();
+        let s = shared.clone();
+        let janitor = std::thread::Builder::new()
+            .name("omt-send-janitor".into())
+            .spawn(move || janitor(stopped, s))?;
         // Announce before starting the accept thread, so a failure leaves nothing running.
         let (discovery, full_name) = if config.announce {
             let d = match (&config.discovery, &config.discovery_server) {
@@ -372,6 +412,8 @@ impl Sender {
             .name("omt-send-accept".into())
             .spawn(move || accept_loop(listener, s))?;
         Ok(Sender {
+            bind: config.bind,
+            janitor: Some((janitor_stop, janitor)),
             shared,
             port,
             full_name,
@@ -811,13 +853,13 @@ impl Drop for Sender {
         for p in self.shared.snapshot() {
             p.close();
         }
-        // Wake the blocking accept.
-        let _ = TcpStream::connect_timeout(
-            &SocketAddr::from(([127, 0, 0, 1], self.port)),
-            Duration::from_millis(200),
-        );
+        wake_accept(self.bind, self.port);
         let deadline = Instant::now() + DROP_TIMEOUT;
         if let Some(h) = self.accept.take() {
+            join_bounded(h, deadline);
+        }
+        if let Some((stop, h)) = self.janitor.take() {
+            drop(stop);
             join_bounded(h, deadline);
         }
         let peers: Vec<Arc<Peer>> = std::mem::take(&mut *self.shared.peers.lock().unwrap());
@@ -915,6 +957,8 @@ struct Shared {
     /// Queued, sent and dropped frames, by [`Kind`].
     counts: [[AtomicU64; 3]; 3],
     bytes_sent: AtomicU64,
+    max_connections: usize,
+    max_connections_per_ip: usize,
 }
 
 const QUEUED: usize = 0;
@@ -1006,6 +1050,8 @@ struct PeerState {
 struct Peer {
     id: u64,
     addr: SocketAddr,
+    /// When it connected, for [`SUBSCRIBE_TIMEOUT`].
+    since: Instant,
     stream: TcpStream,
     /// Tells the reader to stop (see [`crate::net`]).
     stop: AtomicBool,
@@ -1018,6 +1064,11 @@ struct Peer {
 }
 
 impl Peer {
+    fn subscribed(&self) -> bool {
+        let s = self.state.lock().unwrap();
+        s.video || s.audio || s.metadata
+    }
+
     fn close(&self) {
         self.outbox.close();
         self.stop.store(true, Ordering::SeqCst);
@@ -1108,10 +1159,17 @@ impl Outbox {
     }
 }
 
-fn bind_first_free(ports: RangeInclusive<u16>) -> io::Result<(TcpListener, u16)> {
+fn bind_first_free(
+    bind: Option<IpAddr>,
+    ports: RangeInclusive<u16>,
+) -> io::Result<(TcpListener, u16)> {
     let mut last = io::Error::new(io::ErrorKind::AddrInUse, "no free port in range");
     for port in ports {
-        match bind_dual_stack(port) {
+        let l = match bind {
+            None => bind_dual_stack(port),
+            Some(ip) => bind_one(SocketAddr::new(ip, port)),
+        };
+        match l {
             Ok(l) => return Ok((l, port)),
             Err(e) if e.kind() == io::ErrorKind::AddrInUse => last = e,
             Err(e) => return Err(e),
@@ -1149,6 +1207,45 @@ pub(crate) fn bind_dual_stack(port: u16) -> io::Result<TcpListener> {
     Ok(s.into())
 }
 
+/// Listens on `addr` only.
+fn bind_one(addr: SocketAddr) -> io::Result<TcpListener> {
+    let s = Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?;
+    #[cfg(unix)]
+    s.set_reuse_address(true)?;
+    s.bind(&addr.into())?;
+    s.listen(5)?;
+    Ok(s.into())
+}
+
+/// Connects to our own listener so its blocking accept returns.
+fn wake_accept(bind: Option<IpAddr>, port: u16) {
+    let ip = match bind {
+        Some(ip) if ip.is_unspecified() && ip.is_ipv6() => IpAddr::V6(Ipv6Addr::LOCALHOST),
+        Some(ip) if !ip.is_unspecified() => ip,
+        _ => IpAddr::V4(Ipv4Addr::LOCALHOST),
+    };
+    let _ = TcpStream::connect_timeout(&SocketAddr::new(ip, port), Duration::from_millis(200));
+}
+
+/// Whether another connection from `ip` fits the sender's limits.
+fn room_for(shared: &Shared, ip: IpAddr) -> bool {
+    let peers = shared.peers.lock().unwrap();
+    let from_ip = peers.iter().filter(|p| p.addr.ip() == ip).count();
+    peers.len() < shared.max_connections && from_ip < shared.max_connections_per_ip
+}
+
+/// Closes connections that have not subscribed within [`SUBSCRIBE_TIMEOUT`],
+/// until `stop` is dropped.
+fn janitor(stop: mpsc::Receiver<()>, shared: Arc<Shared>) {
+    while let Err(mpsc::RecvTimeoutError::Timeout) = stop.recv_timeout(Duration::from_millis(250)) {
+        for p in shared.snapshot() {
+            if p.since.elapsed() >= SUBSCRIBE_TIMEOUT && !p.subscribed() {
+                p.close();
+            }
+        }
+    }
+}
+
 fn accept_loop(listener: TcpListener, shared: Arc<Shared>) {
     let mut next_id = 0u64;
     for conn in listener.incoming() {
@@ -1156,6 +1253,15 @@ fn accept_loop(listener: TcpListener, shared: Arc<Shared>) {
             break;
         }
         let Ok(stream) = conn else { continue };
+        let Ok(addr) = stream.peer_addr() else {
+            continue;
+        };
+        // Compared as the peer list holds them: an IPv4 client on the
+        // dual-stack socket is `::ffff:a.b.c.d` in both.
+        if !room_for(&shared, addr.ip()) {
+            let _ = stream.shutdown(Shutdown::Both);
+            continue;
+        }
         next_id += 1;
         if let Err(e) = start_peer(stream, next_id, &shared) {
             // A connection that fails during setup is simply dropped.
@@ -1171,6 +1277,7 @@ fn start_peer(stream: TcpStream, id: u64, shared: &Arc<Shared>) -> io::Result<()
     let peer = Arc::new(Peer {
         id,
         addr,
+        since: Instant::now(),
         stream: stream.try_clone()?,
         stop: AtomicBool::new(false),
         state: Mutex::new(PeerState::default()),
@@ -1203,20 +1310,39 @@ fn start_peer(stream: TcpStream, id: u64, shared: &Arc<Shared>) -> io::Result<()
         shared.queue(&peer, Arc::new(out), Kind::Metadata);
     }
 
-    let writer_peer = peer.clone();
-    let writer_shared = shared.clone();
+    // Listed before its threads start, so a connection that closes at once
+    // is removed rather than left behind with its tally (bug hunt #2).
+    shared.peers.lock().unwrap().push(peer.clone());
+    let started = spawn_peer_threads(stream, &peer, shared);
+    if let Err(e) = started {
+        // Closing the outbox ends a writer that did start.
+        peer.close();
+        shared.remove(peer.id);
+        return Err(e);
+    }
+    if shared.closing.load(Ordering::SeqCst) {
+        // `Drop` may have closed the peers before this one was listed.
+        peer.close();
+    }
+    shared.update_tally();
+    Ok(())
+}
+
+fn spawn_peer_threads(stream: TcpStream, peer: &Arc<Peer>, shared: &Arc<Shared>) -> io::Result<()> {
+    let id = peer.id;
+    let (writer_peer, writer_shared) = (peer.clone(), shared.clone());
     let writer_stream = stream.try_clone()?;
     let writer = std::thread::Builder::new()
         .name(format!("omt-send-w{id}"))
         .spawn(move || write_loop(writer_stream, writer_peer, writer_shared))?;
-    let reader_peer = peer.clone();
-    let reader_shared = shared.clone();
+    peer.threads.lock().unwrap().push(writer);
+    let (reader_peer, reader_shared) = (peer.clone(), shared.clone());
     let reader = std::thread::Builder::new()
         .name(format!("omt-send-r{id}"))
         .spawn(move || read_loop(stream, reader_peer, reader_shared))?;
-    peer.threads.lock().unwrap().extend([writer, reader]);
-    shared.peers.lock().unwrap().push(peer);
-    shared.update_tally();
+    peer.threads.lock().unwrap().push(reader);
+    #[cfg(test)]
+    std::thread::sleep(tests::AFTER_SPAWN.with(|d| d.get()));
     Ok(())
 }
 
@@ -1324,6 +1450,13 @@ mod tests {
     use crate::OwnedFrame;
     use vmx_codec::{Frame, PixelFormat};
 
+    thread_local! {
+        /// How long `spawn_peer_threads` sleeps after starting the threads,
+        /// to widen the window of bug hunt #2.
+        pub(super) static AFTER_SPAWN: std::cell::Cell<Duration> =
+            const { std::cell::Cell::new(Duration::ZERO) };
+    }
+
     fn quiet(name: &str) -> SenderConfig {
         SenderConfig {
             announce: false,
@@ -1343,6 +1476,107 @@ mod tests {
             assert!(Instant::now() < deadline, "timed out");
             std::thread::sleep(Duration::from_millis(10));
         }
+    }
+
+    /// Connects, subscribes and sets program tally; the caller closes it.
+    fn tally_client(port: u16) -> TcpStream {
+        let mut c = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let mut out = Vec::new();
+        frame::write_metadata(0, Command::SubscribeMetadata.as_bytes(), &mut out);
+        let program = Tally {
+            preview: false,
+            program: true,
+        };
+        frame::write_metadata(0, Command::Tally(program).as_bytes(), &mut out);
+        c.write_all(&out).unwrap();
+        c
+    }
+
+    #[test]
+    fn connections_that_close_at_once_are_not_left_behind() {
+        // Bug hunt #2: a connection whose reader finished before it was
+        // listed stayed listed for good, with its tally. Each connection
+        // here has already sent its tally and closed when it is started.
+        // The reader gets 20 ms to finish before `start_peer` goes on.
+        let s = Sender::new(quiet("race")).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        AFTER_SPAWN.with(|d| d.set(Duration::from_millis(20)));
+        for id in 0..10 {
+            let c = tally_client(listener.local_addr().unwrap().port());
+            c.shutdown(Shutdown::Both).unwrap();
+            let (stream, _) = listener.accept().unwrap();
+            start_peer(stream, 1_000_000 + id, &s.shared).unwrap();
+        }
+        AFTER_SPAWN.with(|d| d.set(Duration::ZERO));
+        wait_for(|| s.connections() == 0);
+        assert_eq!(s.tally(), Tally::default());
+    }
+
+    #[test]
+    fn connections_beyond_the_limits_are_closed() {
+        let s = Sender::new(SenderConfig {
+            max_connections: 5,
+            max_connections_per_ip: 3,
+            ..quiet("limits")
+        })
+        .unwrap();
+        let held: Vec<TcpStream> = (0..4).map(|_| tally_client(s.port())).collect();
+        wait_for(|| s.connections() == 3);
+        // The fourth one from 127.0.0.1 was closed by the sender.
+        let mut extra = &held[3];
+        extra
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let mut buf = [0u8; 4096];
+        let mut closed = false;
+        while let Ok(n) = io::Read::read(&mut extra, &mut buf) {
+            if n == 0 {
+                closed = true;
+                break;
+            }
+        }
+        assert!(closed, "the connection over the per-IP limit was closed");
+        // Room again once one leaves.
+        drop(held);
+        wait_for(|| s.connections() == 0);
+        let again: Vec<TcpStream> = (0..3).map(|_| tally_client(s.port())).collect();
+        wait_for(|| s.connections() == 3);
+        drop(again);
+    }
+
+    #[test]
+    fn a_connection_that_never_subscribes_is_closed() {
+        let s = Sender::new(quiet("idle")).unwrap();
+        let idle = TcpStream::connect(("127.0.0.1", s.port())).unwrap();
+        let _subscribed = tally_client(s.port());
+        wait_for(|| s.connections() == 2);
+        let start = Instant::now();
+        while s.connections() != 1 {
+            assert!(
+                start.elapsed() < SUBSCRIBE_TIMEOUT + Duration::from_secs(2),
+                "the idle connection was not closed"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(start.elapsed() >= SUBSCRIBE_TIMEOUT - Duration::from_millis(500));
+        drop(idle);
+    }
+
+    #[test]
+    fn bind_listens_on_one_address() {
+        let s = Sender::new(SenderConfig {
+            bind: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            ..quiet("bound")
+        })
+        .unwrap();
+        let _c = tally_client(s.port());
+        wait_for(|| s.connections() == 1);
+        let start = Instant::now();
+        drop(s);
+        assert!(
+            start.elapsed() < Duration::from_secs(1),
+            "drop woke the accept"
+        );
     }
 
     #[test]
