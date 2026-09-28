@@ -14,9 +14,17 @@ whatever the code suggests.
 | 2026-09-21 | sender serving preview | libomtnet receiver in preview | 1.0.0.19 | macOS 26.5.1, LAN address | **works**: preview pixels identical on both receivers and to libomtnet's sender; correct per-frame metadata | [`evidence/2026-09-21-preview`](evidence/2026-09-21-preview/README.md) (P2) |
 | 2026-09-21 | receiver reconnect | libomtnet sender, restarted | 1.0.0.19 | macOS 26.5.1, loopback | **works**: closed on reset, reconnected within 1 s, frames resumed from the new sender | [`evidence/2026-09-21-reconnect`](evidence/2026-09-21-reconnect/README.md) |
 | 2026-09-21 | **released binary** `omt` v0.1.0 (aarch64-apple-darwin, downloaded from the draft GitHub release) — send and recv | libomtnet receiver / sender | 1.0.0.19 | macOS 26.5.1, one host | **works** both ways: 120 video frames at 1280x720 received by libomtnet; 30 fps, 0 decode errors, snapshot saved from libomtnet's stream | this table row; archive SHA-256 prefix `24b46152c6545d5c` |
+| 2026-09-28 | discovery browse + announce | our `omt` on the other machine | 0.1.0 (`48c3984`) | macOS 26.5.1 arm64 ↔ Linux Mint 22.3 x86_64, wired LAN | **works** both ways across the network: macOS mDNSResponder and Linux avahi each list the other's source with the right host, IP and port | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §1 |
+| 2026-09-28 | sender (Mac, arm64) | our receiver (NUC, x86_64) | 0.1.0 (`48c3984`) | macOS 26.5.1 ↔ Linux Mint 22.3, wired LAN | **works**: 1280x720 30 fps, ~5.9 Mbit/s, 48 kHz stereo, 0 decode errors over 8 s; snapshot decoded correctly on x86_64 from an arm64 VMX1 stream | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §2 |
+| 2026-09-28 | receiver (Mac, arm64) | our sender (NUC, x86_64) | 0.1.0 (`48c3984`) | macOS 26.5.1 ↔ Linux Mint 22.3, wired LAN | **works**: 1280x720 30 fps, 0 decode errors; snapshot decoded correctly on arm64 from an x86_64 VMX1 stream | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §3 |
+| 2026-09-28 | receiver reconnect by name | our sender (NUC, x86_64), restarted | 0.1.0 (`48c3984`) | macOS 26.5.1 ↔ Linux Mint 22.3, wired LAN | **works**: Mac receiver lost the NUC sender, retried, re-resolved the name over mDNS and reconnected on its own, resuming at 30 fps with 0 decode errors | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §4 |
+
+Rows dated 2026-09-28 are `omt`-to-`omt` between two machines — the first runs on
+a real network, on Linux, and on x86_64. They do not involve a third-party product.
 
 ## Not yet tested
 
-- Redirect, the discovery server.
+- Redirect between separate machines, the discovery server between separate machines.
 - vMix, OBS with the OMT plugin, SIENNA tools, the Raspberry Pi encoder/decoder.
-- Anything across a real network, or on Windows or Linux (their v0.1.0 binaries were built by CI but never run).
+- Windows (the v0.1.0 Windows binary was built by CI but never run), and Wi-Fi /
+  cross-subnet networks (the 2026-09-28 tests were on a single wired subnet).

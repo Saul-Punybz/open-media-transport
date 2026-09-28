@@ -1,6 +1,14 @@
 # STATUS — Open Media Transport in Rust
 
-**Last updated:** 23 Sep 2026 (evening) — pre-testing-week batch in flight (see "In flight" below). Earlier today: addressing (connect by name/URL, re-resolve, redirect), decoding receive API + 10-bit snapshots, and the discovery server are merged and verified against libomtnet; SIMD for vmx-codec and the Caudal-M12 prerequisites merged too.
+**Last updated:** 28 Sep 2026 — **first cross-machine run.** `omt` v0.1.0 (`48c3984`)
+built on a Linux Mint x86_64 NUC and run against the Mac's `omt` over a real wired
+LAN: discovery both ways (macOS mDNSResponder ↔ Linux avahi), video+audio both ways
+(1280x720 30 fps, 0 decode errors, snapshots correct — the VMX codec's first run on
+x86_64, encoding and decoding), and reconnect-by-name after the sender restarts.
+Evidence `docs/evidence/2026-09-28-cross-machine`, four rows in `docs/INTEROP.md`.
+Still nothing against vMix / OBS / a Pi, and nothing on Windows or over Wi-Fi.
+
+Earlier (23 Sep 2026, evening) — pre-testing-week batch in flight (see "In flight" below). That day: addressing (connect by name/URL, re-resolve, redirect), decoding receive API + 10-bit snapshots, and the discovery server are merged and verified against libomtnet; SIMD for vmx-codec and the Caudal-M12 prerequisites merged too.
 
 ## RESUME HERE
 
@@ -19,9 +27,11 @@ Public repo `Saul-Punybz/open-media-transport`, licensed MIT OR Apache-2.0.
 | `open-media-transport` | The protocol: discovery, sending, receiving, implemented from `docs/PROTOCOL.md` | **Receiver, sender, discovery.** Against libomtnet 1.0.0.19 on one Mac: we receive what it sends and it receives what we send, with identical decoded pixels both ways, each side finding the other by name (`docs/INTEROP.md`). Receiver reconnects. Deframer and command matching fuzzed (25 M runs, no failure). `Clock` generates and paces timestamps like libomtnet. No redirect or discovery server yet. 40 tests. |
 
 **What is NOT true yet, and must not be claimed:** nothing has talked to vMix, OBS or
-the Raspberry Pi devices. Our receiver, sender and discovery have talked to libomtnet itself,
-on one Mac (`docs/INTEROP.md`) — that is the whole of our interop evidence. Matching
-the reference implementation's bytes proves the codec; it is not a live handshake.
+the Raspberry Pi devices. Our interop evidence is (a) `omt` and libomtnet against each
+other on one Mac, and (b) as of 28 Sep, our `omt` against our own `omt` across two
+machines / two OSes / two arches over a real LAN (`docs/INTEROP.md`, `docs/evidence/2026-09-28-cross-machine`).
+Neither is a third-party product. Matching the reference implementation's bytes proves
+the codec; it is not a live handshake with vMix/OBS/Pi.
 `vmx-codec` has no SIMD, so it encodes 2.2x-3.2x slower than the C reference
 (`crates/vmx-codec/BENCH.md`) — one core still does 1080p60 at OMT's default quality.
 Caudal does not speak OMT; that integration is Caudal's M12 and comes after this.
