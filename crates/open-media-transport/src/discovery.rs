@@ -14,11 +14,22 @@
 //! between senders ([`crate::sender::SenderConfig::discovery`]) and
 //! directories ([`crate::address::Directory::with_shared`]), so only one
 //! mDNS responder runs. [`DiscoveryConfig::interfaces`] limits the
-//! interfaces it uses.
+//! interfaces it uses. It runs one mDNS browse, started by the first
+//! [`Discovery::browse`], and hands every [`Browser`] the same events, the
+//! sources already known first: `mdns-sd` keeps a single listener per
+//! service type, so a second browse of its own would silence the first.
+//!
+//! A name can be announced once per [`Discovery`]: announcing it again is an
+//! error, so dropping one sender can never withdraw another's announcement.
+//! libomtnet ignores the second registration and withdraws the name when
+//! either sender goes (`OMTDiscovery.cs:304-325`, `OMTSend.cs:125,263`).
 
+use std::collections::HashMap;
 use std::fmt;
 use std::net::IpAddr;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 use mdns_sd::{IfKind, ServiceDaemon, ServiceEvent, ServiceInfo};
 
@@ -148,6 +159,58 @@ impl Default for DiscoveryConfig {
 pub struct Discovery {
     daemon: Option<ServiceDaemon>,
     server: Option<Client>,
+    /// The one mDNS browse, once started.
+    mdns: Mutex<Option<(Arc<Fanout>, JoinHandle<()>)>>,
+    /// Names announced here, with their ports.
+    announced: Mutex<HashMap<String, u16>>,
+}
+
+/// Sources seen by the mDNS browse, and the browsers to tell.
+#[derive(Default)]
+struct Fanout {
+    state: Mutex<FanoutState>,
+}
+
+#[derive(Default)]
+struct FanoutState {
+    sources: HashMap<String, Source>,
+    subscribers: Vec<flume::Sender<SourceEvent>>,
+}
+
+impl Fanout {
+    /// A feed of changes, starting with the sources already known.
+    fn subscribe(&self) -> flume::Receiver<SourceEvent> {
+        let (tx, rx) = flume::unbounded();
+        let mut st = self.state.lock().unwrap();
+        for s in st.sources.values() {
+            let _ = tx.send(SourceEvent::Resolved(s.clone()));
+        }
+        st.subscribers.push(tx);
+        rx
+    }
+
+    fn publish(&self, e: SourceEvent) {
+        let mut st = self.state.lock().unwrap();
+        match &e {
+            SourceEvent::Resolved(s) => {
+                st.sources.insert(s.full_name.clone(), s.clone());
+            }
+            SourceEvent::Removed(name) => {
+                st.sources.remove(name);
+            }
+        }
+        // Browsers that were dropped go.
+        st.subscribers.retain(|tx| tx.send(e.clone()).is_ok());
+    }
+}
+
+/// Maps the browse's events for the browsers until the daemon stops.
+fn pump(events: mdns_sd::Receiver<ServiceEvent>, fanout: Arc<Fanout>) {
+    while let Ok(e) = events.recv() {
+        if let Some(e) = map_event(e) {
+            fanout.publish(e);
+        }
+    }
 }
 
 impl fmt::Debug for Discovery {
@@ -176,7 +239,12 @@ impl Discovery {
         } else {
             None
         };
-        Ok(Discovery { daemon, server })
+        Ok(Discovery {
+            daemon,
+            server,
+            mdns: Mutex::new(None),
+            announced: Mutex::new(HashMap::new()),
+        })
     }
 
     /// Uses the discovery server at `url` (`omt://host[:port]`, port 6399 by
@@ -200,12 +268,25 @@ impl Discovery {
     }
 
     /// Announces a source called `name` on `port` and returns its full name.
-    /// It stays announced until [`Discovery::withdraw`] or drop.
+    /// It stays announced until [`Discovery::withdraw`] or drop. A full name
+    /// already announced here is an error.
     pub fn announce(&self, name: &str, port: u16) -> Result<String, Error> {
         let full = full_name(&machine_name(), name);
+        let mut announced = self.announced.lock().unwrap();
+        if let Some(p) = announced.get(&full) {
+            return Err(Error::Msg(format!(
+                "{full} is already announced here, on port {p}"
+            )));
+        }
+        self.register(&full, port)?;
+        announced.insert(full.clone(), port);
+        Ok(full)
+    }
+
+    fn register(&self, full: &str, port: u16) -> Result<(), Error> {
         if let Some(server) = &self.server {
-            server.register(&full, port);
-            return Ok(full);
+            server.register(full, port);
+            return Ok(());
         }
         let Some(daemon) = &self.daemon else {
             return Err(Error::Msg("no discovery method".into()));
@@ -213,19 +294,22 @@ impl Discovery {
         let host = srv_host(&os_host_name());
         let info = ServiceInfo::new(
             SERVICE_TYPE,
-            &full,
+            full,
             &host,
             (),
             port,
-            None::<std::collections::HashMap<String, String>>,
+            None::<HashMap<String, String>>,
         )?
         .enable_addr_auto();
-        daemon.register(info)?;
-        Ok(full)
+        daemon.register(info)
     }
 
-    /// Withdraws a source announced with [`Discovery::announce`].
+    /// Withdraws a source announced with [`Discovery::announce`]. A name
+    /// not announced here is left alone.
     pub fn withdraw(&self, full_name: &str) -> Result<(), Error> {
+        if self.announced.lock().unwrap().remove(full_name).is_none() {
+            return Ok(());
+        }
         if let Some(server) = &self.server {
             server.deregister(full_name);
             return Ok(());
@@ -239,15 +323,33 @@ impl Discovery {
         Ok(())
     }
 
-    /// Starts browsing for sources.
+    /// Starts browsing for sources. Every browser of one [`Discovery`]
+    /// shares its single mDNS browse.
     pub fn browse(&self) -> Result<Browser, Error> {
         Ok(Browser {
             events: match &self.daemon {
-                Some(d) => Some(d.browse(SERVICE_TYPE)?),
+                Some(d) => Some(self.mdns_fanout(d)?.subscribe()),
                 None => None,
             },
             server: self.server.as_ref().map(Client::subscribe),
         })
+    }
+
+    /// The mDNS browse, started on first use.
+    fn mdns_fanout(&self, daemon: &ServiceDaemon) -> Result<Arc<Fanout>, Error> {
+        let mut m = self.mdns.lock().unwrap();
+        if let Some((f, _)) = &*m {
+            return Ok(f.clone());
+        }
+        let events = daemon.browse(SERVICE_TYPE)?;
+        let fanout = Arc::new(Fanout::default());
+        let f = fanout.clone();
+        let h = std::thread::Builder::new()
+            .name("omt-discovery-browse".into())
+            .spawn(move || pump(events, f))
+            .map_err(|e| Error::Msg(e.to_string()))?;
+        *m = Some((fanout.clone(), h));
+        Ok(fanout)
     }
 }
 
@@ -293,18 +395,17 @@ impl Drop for Discovery {
                 let _ = done.recv_timeout(Duration::from_secs(1));
             }
         }
+        // The browse channel closed with the daemon; its pump ends.
+        if let Some((_, h)) = self.mdns.lock().unwrap().take() {
+            crate::sender::join_bounded(h, Instant::now() + Duration::from_secs(1));
+        }
     }
 }
 
 /// A running browse for `_omt._tcp`, and/or a discovery server's reports.
 pub struct Browser {
-    events: Option<mdns_sd::Receiver<ServiceEvent>>,
+    events: Option<flume::Receiver<SourceEvent>>,
     server: Option<flume::Receiver<SourceEvent>>,
-}
-
-enum Either {
-    Mdns(ServiceEvent),
-    Server(SourceEvent),
 }
 
 impl Browser {
@@ -315,61 +416,56 @@ impl Browser {
     /// and DNS-SD; libomtnet merges them into one entry by full name
     /// (`OMTDiscovery.cs:193-247`), and so should the caller.
     pub fn recv_timeout(&self, timeout: Duration) -> Option<SourceEvent> {
-        let deadline = std::time::Instant::now() + timeout;
-        loop {
-            let left = deadline.checked_duration_since(std::time::Instant::now())?;
-            let event = match (&self.events, &self.server) {
-                (Some(m), Some(s)) => flume::Selector::new()
-                    .recv(m, |r| r.ok().map(Either::Mdns))
-                    .recv(s, |r| r.ok().map(Either::Server))
-                    .wait_timeout(left)
-                    .ok()??,
-                (Some(m), None) => Either::Mdns(m.recv_timeout(left).ok()?),
-                (None, Some(s)) => Either::Server(s.recv_timeout(left).ok()?),
-                (None, None) => {
-                    std::thread::sleep(left);
-                    return None;
-                }
-            };
-            let event = match event {
-                Either::Server(e) => return Some(e),
-                Either::Mdns(e) => e,
-            };
-            let mapped = match event {
-                ServiceEvent::ServiceResolved(s) => {
-                    let full_name = instance_name(&s.fullname);
-                    if !is_valid_full_name(&full_name) {
-                        continue;
-                    }
-                    // IPv6 link-local addresses need an interface to be
-                    // usable and libomtnet ignores them (D10,
-                    // `OMTAddress.cs:98-101`); so do we. mdns-sd reports a
-                    // service as soon as it has any address, so an event may
-                    // carry none that is usable yet: wait for the next one.
-                    let mut addresses: Vec<IpAddr> = s
-                        .addresses
-                        .iter()
-                        .map(|a| a.to_ip_addr())
-                        .filter(|a| !is_ipv6_link_local(a))
-                        .collect();
-                    if addresses.is_empty() {
-                        continue;
-                    }
-                    addresses.sort_by_key(address_preference);
-                    SourceEvent::Resolved(Source {
-                        full_name,
-                        host: s.host.clone(),
-                        port: s.port,
-                        addresses,
-                    })
-                }
-                ServiceEvent::ServiceRemoved(_, fullname) => {
-                    SourceEvent::Removed(instance_name(&fullname))
-                }
-                _ => continue,
-            };
-            return Some(mapped);
+        match (&self.events, &self.server) {
+            (Some(m), Some(s)) => flume::Selector::new()
+                .recv(m, |r| r.ok())
+                .recv(s, |r| r.ok())
+                .wait_timeout(timeout)
+                .ok()?,
+            (Some(m), None) => m.recv_timeout(timeout).ok(),
+            (None, Some(s)) => s.recv_timeout(timeout).ok(),
+            (None, None) => {
+                std::thread::sleep(timeout);
+                None
+            }
         }
+    }
+}
+
+/// What a browse event means for OMT, if anything. Instances without `(`
+/// and `)` in their name are skipped, as libomtnet skips them (D7).
+fn map_event(event: ServiceEvent) -> Option<SourceEvent> {
+    match event {
+        ServiceEvent::ServiceResolved(s) => {
+            let full_name = instance_name(&s.fullname);
+            if !is_valid_full_name(&full_name) {
+                return None;
+            }
+            // IPv6 link-local addresses need an interface to be usable and
+            // libomtnet ignores them (D10, `OMTAddress.cs:98-101`); so do we.
+            // mdns-sd reports a service as soon as it has any address, so an
+            // event may carry none that is usable yet: wait for the next one.
+            let mut addresses: Vec<IpAddr> = s
+                .addresses
+                .iter()
+                .map(|a| a.to_ip_addr())
+                .filter(|a| !is_ipv6_link_local(a))
+                .collect();
+            if addresses.is_empty() {
+                return None;
+            }
+            addresses.sort_by_key(address_preference);
+            Some(SourceEvent::Resolved(Source {
+                full_name,
+                host: s.host.clone(),
+                port: s.port,
+                addresses,
+            }))
+        }
+        ServiceEvent::ServiceRemoved(_, fullname) => {
+            Some(SourceEvent::Removed(instance_name(&fullname)))
+        }
+        _ => None,
     }
 }
 
@@ -440,6 +536,88 @@ fn instance_name(fullname: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn source(name: &str, port: u16) -> Source {
+        Source {
+            full_name: name.into(),
+            host: "test-omt.local.".into(),
+            port,
+            addresses: vec!["127.0.0.1".parse().unwrap()],
+        }
+    }
+
+    #[test]
+    fn every_browser_gets_every_event_and_late_ones_the_current_state() {
+        // Bug hunt #1: a second browse on a shared Discovery silenced the first.
+        let f = Fanout::default();
+        let first = f.subscribe();
+        let second = f.subscribe();
+        f.publish(SourceEvent::Resolved(source("A (one)", 1)));
+        f.publish(SourceEvent::Resolved(source("A (two)", 2)));
+        f.publish(SourceEvent::Removed("A (one)".into()));
+        for rx in [&first, &second] {
+            let got: Vec<SourceEvent> = rx.try_iter().collect();
+            assert_eq!(got.len(), 3);
+        }
+        let late = f.subscribe();
+        assert_eq!(
+            late.try_iter().collect::<Vec<_>>(),
+            [SourceEvent::Resolved(source("A (two)", 2))]
+        );
+        // A dropped browser is forgotten.
+        drop(first);
+        f.publish(SourceEvent::Removed("A (two)".into()));
+        assert_eq!(f.state.lock().unwrap().subscribers.len(), 2);
+    }
+
+    #[test]
+    fn a_name_is_announced_once_and_only_its_owner_withdraws_it() {
+        // Bug hunt #3: a second sender with the same name was accepted, and
+        // dropping it withdrew the first one's registration.
+        use crate::discovery_server::Server;
+        use crate::sender::{Sender, SenderConfig};
+        let server = Server::bind(0).unwrap();
+        let url = format!("omt://127.0.0.1:{}", server.port());
+        let shared = Arc::new(Discovery::with_server(&url, false).unwrap());
+        let cfg = || SenderConfig {
+            discovery: Some(shared.clone()),
+            ports: 17400..=17600,
+            ..SenderConfig::new("dup")
+        };
+        let a = Sender::new(cfg()).unwrap();
+        assert!(Sender::new(cfg()).is_err(), "the same name twice");
+        // Withdrawing a name this Discovery does not own changes nothing.
+        shared.withdraw("NOT (ours)").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while !server.entries().iter().any(|e| e.address.port == a.port()) {
+            assert!(Instant::now() < deadline, "a is registered");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(server.entries().iter().any(|e| e.address.port == a.port()));
+        // Once a is gone, the name is free again.
+        drop(a);
+        let b = Sender::new(cfg()).unwrap();
+        drop(b);
+    }
+
+    #[test]
+    #[ignore = "uses the network's mDNS"]
+    fn two_directories_on_one_discovery_both_hear() {
+        use crate::address::Directory;
+        use crate::sender::{Sender, SenderConfig};
+        let shared = Arc::new(Discovery::new().unwrap());
+        let d1 = Directory::with_shared(shared.clone()).unwrap();
+        let d2 = Directory::with_shared(shared.clone()).unwrap();
+        let s = Sender::new(SenderConfig {
+            ports: 17400..=17600,
+            ..SenderConfig::new("two-dirs")
+        })
+        .unwrap();
+        let full = s.full_name().unwrap().to_owned();
+        assert!(d2.wait_for(&full, Duration::from_secs(8)).is_some());
+        assert!(d1.wait_for(&full, Duration::from_secs(2)).is_some());
+    }
 
     #[test]
     fn full_name_format_and_limit() {

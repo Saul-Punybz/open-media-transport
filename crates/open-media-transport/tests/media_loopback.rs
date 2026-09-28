@@ -172,6 +172,9 @@ fn audio_and_metadata_round_trip() {
         samples[i] = (i as f32 / 480.0).sin();
         samples[2 * 480 + i] = -0.5;
     }
+    // The metadata subscription comes on the video connection, just before
+    // the video one; the audio one on the other connection may be handled first.
+    wait_for(|| tx.video_receivers() == 1);
     wait_for(|| tx.send_audio(&samples, 3, 48000, 99, b"<A />") == Ok(1));
     assert!(tx.send_metadata(b"<App X=\"1\" />\0", 5) >= 1);
 

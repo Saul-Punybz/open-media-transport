@@ -1,12 +1,12 @@
 # STATUS — Open Media Transport in Rust
 
 **Last updated:** 28 Sep 2026 — **first cross-machine run.** `omt` v0.1.0 (`48c3984`)
-built on a Linux Mint x86_64 NUC and run against the Mac's `omt` over a real wired
-LAN: discovery both ways (macOS mDNSResponder ↔ Linux avahi), video+audio both ways
+built on a Linux Mint x86_64 NUC and run against the Mac's `omt` over a real network
+(both on Wi-Fi): discovery both ways (macOS mDNSResponder ↔ Linux avahi), video+audio both ways
 (1280x720 30 fps, 0 decode errors, snapshots correct — the VMX codec's first run on
 x86_64, encoding and decoding), and reconnect-by-name after the sender restarts.
 Evidence `docs/evidence/2026-09-28-cross-machine`, four rows in `docs/INTEROP.md`.
-Still nothing against vMix / OBS / a Pi, and nothing on Windows or over Wi-Fi.
+Still nothing against vMix / OBS / a Pi, and nothing on Windows or over a wired network.
 
 Earlier (23 Sep 2026, evening) — pre-testing-week batch in flight (see "In flight" below). That day: addressing (connect by name/URL, re-resolve, redirect), decoding receive API + 10-bit snapshots, and the discovery server are merged and verified against libomtnet; SIMD for vmx-codec and the Caudal-M12 prerequisites merged too.
 

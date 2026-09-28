@@ -1,0 +1,8 @@
+connected (Video channel) to 172.16.80.73:6400
+connected (Audio channel) to 172.16.80.73:6400
+redirected to SAULS-MACBOOK-PRO.LOCAL (FL Real)
+   1.0s  video 640x360 30.00 fps | 29.7 fps received | 2.1 Mbit/s | audio 48000 Hz 2 ch, 3/31 frames with sound | decode errors 0
+   2.0s  video 640x360 30.00 fps | 30.1 fps received | 2.1 Mbit/s | audio 48000 Hz 2 ch, 3/31 frames with sound | decode errors 0
+   3.1s  video 640x360 30.00 fps | 31.0 fps received | 2.2 Mbit/s | audio 48000 Hz 2 ch, 3/30 frames with sound | decode errors 0
+   4.1s  video 640x360 30.00 fps | 29.0 fps received | 2.0 Mbit/s | audio 48000 Hz 2 ch, 3/32 frames with sound | decode errors 0
+   5.1s  video 640x360 30.00 fps | 31.0 fps received | 2.2 Mbit/s | audio 48000 Hz 2 ch, 3/29 frames with sound | decode errors 0

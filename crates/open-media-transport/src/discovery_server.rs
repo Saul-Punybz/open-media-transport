@@ -27,6 +27,26 @@
 //! but nothing in the code orders the two. Here the table is sent when the
 //! connection's `<OMTSubscribe Metadata="true" />` arrives, so a new client
 //! always gets it.
+//!
+//! **Limits.** Upstream's server trusts every client: any connection can
+//! remove any source, register any number, and a client that stops reading
+//! blocks the server (`server/OMTDiscoveryServer.cs:192-211`). Here:
+//!
+//! - a source can only be removed by the connection that registered it, so
+//!   no client can take over another's name;
+//! - a full name longer than [`MAX_FULL_NAME_BYTES`] is ignored (a host
+//!   name has at most 63 characters, and libomtnet cuts the rest of a full
+//!   name to fit 63);
+//! - a connection may register at most
+//!   [`ServerConfig::max_entries_per_connection`] sources, the server holds
+//!   at most [`ServerConfig::max_entries`] and accepts at most
+//!   [`ServerConfig::max_connections`] clients; registrations beyond a limit
+//!   are ignored, as upstream ignores one it does not accept;
+//! - each connection has its own writer thread and queue, so the table is
+//!   never locked while writing, and a client whose queue fills is dropped.
+//!
+//! A libomtnet client registers its own few sources and removes only those,
+//! so none of this changes what it sees.
 
 use std::collections::BTreeMap;
 use std::io::{self, Write};
@@ -54,6 +74,30 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 /// A server write that cannot complete in this time drops that connection,
 /// so one stuck client cannot stall the others.
 const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Longest full name the server accepts, in bytes.
+pub const MAX_FULL_NAME_BYTES: usize = 1024;
+
+/// Limits for a [`Server`]; see the module documentation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ServerConfig {
+    /// Client connections at once; more are closed as they arrive.
+    pub max_connections: usize,
+    /// Sources one connection may register.
+    pub max_entries_per_connection: usize,
+    /// Sources the server holds.
+    pub max_entries: usize,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        ServerConfig {
+            max_connections: 512,
+            max_entries_per_connection: 256,
+            max_entries: 4096,
+        }
+    }
+}
 
 /// One `<OMTAddress>` message (S3, `OMTAddress.cs:251-322`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -454,6 +498,11 @@ impl ClientShared {
             let Ok(writer) = stream.try_clone() else {
                 continue;
             };
+            // Writes happen with `state` locked: a server that stops reading
+            // must not hang `register`, `deregister` or the reader.
+            if writer.set_write_timeout(Some(WRITE_TIMEOUT)).is_err() {
+                continue;
+            }
             {
                 let mut st = self.state.lock().unwrap();
                 if st.closing {
@@ -615,6 +664,7 @@ pub struct Server {
 }
 
 struct ServerShared {
+    config: ServerConfig,
     table: Mutex<Table>,
     readers: Mutex<Vec<JoinHandle<()>>>,
     events: mpsc::SyncSender<ServerEvent>,
@@ -629,6 +679,8 @@ struct Table {
 
 struct Entry {
     address: AddressMessage,
+    /// `address` as a frame, shared by every connection it is sent to.
+    frame: Arc<Vec<u8>>,
     peer: u64,
     from: SocketAddr,
 }
@@ -640,18 +692,56 @@ struct Peer {
     metadata: AtomicBool,
     /// Tells the reader to stop (see [`crate::net`]).
     stop: AtomicBool,
+    outbox: Mutex<Outbox>,
+    ready: Condvar,
+}
+
+/// Frames waiting for a connection's writer thread.
+#[derive(Default)]
+struct Outbox {
+    frames: std::collections::VecDeque<Arc<Vec<u8>>>,
+    closed: bool,
 }
 
 impl Peer {
-    /// Writes one metadata frame. Called with the table locked, so frames
-    /// never interleave. A failed or timed-out write closes the connection.
-    fn send(&self, bytes: &[u8]) {
-        if (&self.stream).write_all(bytes).is_err() {
+    /// Queues one metadata frame for the writer thread. Never blocks, so it
+    /// can be called with the table locked, which keeps frames in order. A
+    /// connection whose queue is full is closed: it is not reading.
+    fn send(&self, bytes: Arc<Vec<u8>>, max_queued: usize) {
+        let mut o = self.outbox.lock().unwrap();
+        if o.closed {
+            return;
+        }
+        if o.frames.len() >= max_queued {
+            drop(o);
             self.close();
+            return;
+        }
+        o.frames.push_back(bytes);
+        self.ready.notify_one();
+    }
+
+    /// The next frame to write; `None` once closed.
+    fn next(&self) -> Option<Arc<Vec<u8>>> {
+        let mut o = self.outbox.lock().unwrap();
+        loop {
+            if o.closed {
+                return None;
+            }
+            if let Some(f) = o.frames.pop_front() {
+                return Some(f);
+            }
+            o = self.ready.wait(o).unwrap();
         }
     }
 
     fn close(&self) {
+        {
+            let mut o = self.outbox.lock().unwrap();
+            o.closed = true;
+            o.frames.clear();
+        }
+        self.ready.notify_all();
         self.stop.store(true, Ordering::SeqCst);
         let _ = self.stream.shutdown(Shutdown::Both);
     }
@@ -662,10 +752,16 @@ impl Server {
     /// the upstream server does (`upstream-OMTDiscoveryServer/Program.cs`,
     /// `OMTSend.cs:64-76`).
     pub fn bind(port: u16) -> io::Result<Server> {
+        Server::bind_with(port, ServerConfig::default())
+    }
+
+    /// [`Server::bind`] with other limits.
+    pub fn bind_with(port: u16, config: ServerConfig) -> io::Result<Server> {
         let listener = crate::sender::bind_dual_stack(port)?;
         let port = listener.local_addr()?.port();
         let (tx, rx) = mpsc::sync_channel(1024);
         let shared = Arc::new(ServerShared {
+            config,
             table: Mutex::new(Table::default()),
             readers: Mutex::new(Vec::new()),
             events: tx,
@@ -755,6 +851,10 @@ impl ServerShared {
                 break;
             }
             let Ok(stream) = conn else { continue };
+            if self.table.lock().unwrap().peers.len() >= self.config.max_connections {
+                let _ = stream.shutdown(Shutdown::Both);
+                continue;
+            }
             next_id += 1;
             let _ = self.start_peer(stream, next_id);
             // Forget readers that have finished.
@@ -773,23 +873,55 @@ impl ServerShared {
             stream: stream.try_clone()?,
             metadata: AtomicBool::new(false),
             stop: AtomicBool::new(false),
+            outbox: Mutex::new(Outbox::default()),
+            ready: Condvar::new(),
         });
-        {
-            let mut t = self.table.lock().unwrap();
-            // libomtnet's sender sends its (always empty) tally to every new
-            // connection, the discovery server's included (`OMTSend.cs:371`).
-            let mut out = Vec::new();
-            frame::write_metadata(0, Command::Tally(Tally::default()).as_bytes(), &mut out);
-            peer.send(&out);
-            t.peers.push(peer.clone());
-        }
+        // libomtnet's sender sends its (always empty) tally to every new
+        // connection, the discovery server's included (`OMTSend.cs:371`).
+        let mut out = Vec::new();
+        frame::write_metadata(0, Command::Tally(Tally::default()).as_bytes(), &mut out);
+        peer.send(Arc::new(out), self.max_queued());
+        // Listed before its threads start, so a connection that closes at
+        // once is removed rather than left behind (as bug hunt #2 in the
+        // sender).
+        self.table.lock().unwrap().peers.push(peer.clone());
         self.event(ServerEvent::Connected(addr));
-        let s = self.clone();
+        if let Err(e) = self.spawn_peer_threads(stream, &peer) {
+            peer.close(); // ends a writer that did start
+            self.table.lock().unwrap().peers.retain(|p| p.id != id);
+            return Err(e);
+        }
+        Ok(())
+    }
+
+    fn spawn_peer_threads(self: &Arc<Self>, stream: TcpStream, peer: &Arc<Peer>) -> io::Result<()> {
+        let id = peer.id;
+        let (s, p, w) = (self.clone(), peer.clone(), stream.try_clone()?);
+        let writer = std::thread::Builder::new()
+            .name(format!("omt-dserver-w{id}"))
+            .spawn(move || s.write_loop(w, p))?;
+        self.readers.lock().unwrap().push(writer);
+        let (s, p) = (self.clone(), peer.clone());
         let reader = std::thread::Builder::new()
             .name(format!("omt-dserver-r{id}"))
-            .spawn(move || s.read_loop(stream, peer))?;
+            .spawn(move || s.read_loop(stream, p))?;
         self.readers.lock().unwrap().push(reader);
         Ok(())
+    }
+
+    /// Frames a connection may have waiting: the whole table, and room for
+    /// the changes that follow it.
+    fn max_queued(&self) -> usize {
+        self.config.max_entries + 1024
+    }
+
+    fn write_loop(&self, mut stream: TcpStream, peer: Arc<Peer>) {
+        while let Some(f) = peer.next() {
+            if stream.write_all(&f).is_err() {
+                peer.close();
+                break;
+            }
+        }
     }
 
     fn read_loop(&self, mut stream: TcpStream, peer: Arc<Peer>) {
@@ -812,7 +944,7 @@ impl ServerShared {
                 }
             }
         }
-        let _ = stream.shutdown(Shutdown::Both);
+        peer.close();
         self.disconnected(&peer);
     }
 
@@ -824,7 +956,7 @@ impl ServerShared {
                     // The full table for a new client (S5), sent once it can
                     // receive it; see the module documentation.
                     for e in &t.entries {
-                        peer.send(&address_frame(&e.address));
+                        peer.send(e.frame.clone(), self.max_queued());
                     }
                 }
             }
@@ -839,8 +971,9 @@ impl ServerShared {
 
     /// `server/OMTDiscoveryServer.cs:192-211`: an unknown name and port is
     /// added with the connection's address in place of the client's (S4);
-    /// a removal of a known one removes it, whichever connection sends it;
-    /// anything else is ignored. Changes go to every metadata connection.
+    /// a removal of a known one removes it; anything else is ignored.
+    /// Changes go to every metadata connection. Unlike upstream, only the
+    /// connection that added a source can remove it, and the limits apply.
     fn update(&self, peer: &Peer, mut m: AddressMessage) {
         let mut t = self.table.lock().unwrap();
         let known = t
@@ -849,21 +982,30 @@ impl ServerShared {
             .position(|e| e.address.full_name == m.full_name && e.address.port == m.port);
         match (known, m.removed) {
             (None, false) => {
+                let own = t.entries.iter().filter(|e| e.peer == peer.id).count();
+                if own >= self.config.max_entries_per_connection
+                    || t.entries.len() >= self.config.max_entries
+                    || m.full_name.len() > MAX_FULL_NAME_BYTES
+                {
+                    return;
+                }
                 m.addresses.clear();
                 m.add_address(peer.addr.ip());
-                broadcast(&t, &m);
+                let frame = address_frame(&m);
+                self.send_to_all(&t, &frame);
                 t.entries.push(Entry {
                     address: m.clone(),
+                    frame,
                     peer: peer.id,
                     from: peer.addr,
                 });
                 drop(t);
                 self.event(ServerEvent::Added(peer.addr, m));
             }
-            (Some(i), true) => {
+            (Some(i), true) if t.entries[i].peer == peer.id => {
                 let mut e = t.entries.remove(i);
                 e.address.removed = true;
-                broadcast(&t, &e.address);
+                self.broadcast(&t, &e.address);
                 drop(t);
                 self.event(ServerEvent::Removed(peer.addr, e.address));
             }
@@ -884,7 +1026,7 @@ impl ServerShared {
             t.entries = kept;
             for mut e in gone {
                 e.address.removed = true;
-                broadcast(&t, &e.address);
+                self.broadcast(&t, &e.address);
                 removed.push(e.address);
             }
         }
@@ -893,22 +1035,25 @@ impl ServerShared {
         }
         self.event(ServerEvent::Disconnected(peer.addr));
     }
-}
 
-fn address_frame(m: &AddressMessage) -> Vec<u8> {
-    let mut out = Vec::new();
-    frame::write_metadata(0, m.to_xml().as_bytes(), &mut out);
-    out
-}
+    /// To every connection subscribed to metadata (`OMTSend.cs:637-658`).
+    fn broadcast(&self, t: &Table, m: &AddressMessage) {
+        self.send_to_all(t, &address_frame(m));
+    }
 
-/// To every connection subscribed to metadata (`OMTSend.cs:637-658`).
-fn broadcast(t: &Table, m: &AddressMessage) {
-    let bytes = address_frame(m);
-    for p in &t.peers {
-        if p.metadata.load(Ordering::SeqCst) {
-            p.send(&bytes);
+    fn send_to_all(&self, t: &Table, frame: &Arc<Vec<u8>>) {
+        for p in &t.peers {
+            if p.metadata.load(Ordering::SeqCst) {
+                p.send(frame.clone(), self.max_queued());
+            }
         }
     }
+}
+
+fn address_frame(m: &AddressMessage) -> Arc<Vec<u8>> {
+    let mut out = Vec::new();
+    frame::write_metadata(0, m.to_xml().as_bytes(), &mut out);
+    Arc::new(out)
 }
 
 #[cfg(test)]
@@ -916,6 +1061,152 @@ mod tests {
     use super::*;
 
     const LIBOMTNET_XML: &str = "<OMTAddress>\n  <Name>HOST (Cam 1)</Name>\n  <Port>6400</Port>\n  <Addresses>\n    <IPAddress>::ffff:127.0.0.1</IPAddress>\n  </Addresses>\n</OMTAddress>";
+
+    /// A client speaking the protocol by hand: subscribed to metadata, and
+    /// never reading unless the test does.
+    fn raw_client(server: &Server) -> TcpStream {
+        let mut c = TcpStream::connect(("127.0.0.1", server.port())).unwrap();
+        let mut out = Vec::new();
+        frame::write_metadata(0, Command::SubscribeMetadata.as_bytes(), &mut out);
+        c.write_all(&out).unwrap();
+        c
+    }
+
+    fn send_address(c: &mut TcpStream, name: &str, port: u16, removed: bool) {
+        let mut m = AddressMessage::new(name, port);
+        m.removed = removed;
+        c.write_all(&address_frame(&m)).unwrap();
+    }
+
+    fn wait_until(mut cond: impl FnMut() -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while !cond() {
+            assert!(Instant::now() < deadline, "timed out");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    #[test]
+    fn only_the_registering_connection_removes_a_source() {
+        // Security review D1: any connection could remove a source and
+        // register it again as its own, taking over its receivers.
+        let server = Server::bind(0).unwrap();
+        let mut owner = raw_client(&server);
+        send_address(&mut owner, "STUDIO (Program)", 6400, false);
+        wait_until(|| server.entries().len() == 1);
+        let mut attacker = raw_client(&server);
+        send_address(&mut attacker, "STUDIO (Program)", 6400, true);
+        send_address(&mut attacker, "STUDIO (Program)", 6400, false);
+        std::thread::sleep(Duration::from_millis(300));
+        let e = server.entries();
+        assert_eq!(e.len(), 1);
+        assert_eq!(e[0].from.port(), owner.local_addr().unwrap().port());
+        // The owner still can.
+        send_address(&mut owner, "STUDIO (Program)", 6400, true);
+        wait_until(|| server.entries().is_empty());
+    }
+
+    #[test]
+    fn registrations_are_limited() {
+        // Security review D2: one connection registered 200,001 sources.
+        let server = Server::bind_with(
+            0,
+            ServerConfig {
+                max_entries_per_connection: 5,
+                max_entries: 8,
+                ..ServerConfig::default()
+            },
+        )
+        .unwrap();
+        let mut a = raw_client(&server);
+        for i in 0..20 {
+            send_address(&mut a, &format!("A (s{i})"), 6400, false);
+        }
+        wait_until(|| server.entries().len() == 5);
+        let mut b = raw_client(&server);
+        for i in 0..20 {
+            send_address(&mut b, &format!("B (s{i})"), 6400, false);
+        }
+        wait_until(|| server.entries().len() == 8);
+        let long = format!("{} (x)", "M".repeat(MAX_FULL_NAME_BYTES));
+        send_address(&mut a, "A (s0)", 6400, true);
+        send_address(&mut a, &long, 6400, false);
+        wait_until(|| server.entries().len() == 7);
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(server.entries().iter().all(|e| e.address.full_name != long));
+    }
+
+    #[test]
+    fn clients_that_stop_reading_do_not_stall_the_others() {
+        // Security review D3: every write happened with the table locked, so
+        // eight subscribers that never read made one registration take 16.8 s.
+        let server = Server::bind(0).unwrap();
+        let silent: Vec<TcpStream> = (0..4).map(|_| raw_client(&server)).collect();
+        wait_until(|| server.connections() == 4);
+        // Enough changes to fill the silent clients' socket buffers.
+        // Not subscribed itself, so the server has no reason to drop it.
+        let mut flood = TcpStream::connect(("127.0.0.1", server.port())).unwrap();
+        let name = format!("{} (flood)", "F".repeat(1000));
+        let flooder = std::thread::spawn(move || {
+            for _ in 0..10_000 {
+                send_address(&mut flood, &name, 6400, false);
+                send_address(&mut flood, &name, 6400, true);
+            }
+            flood
+        });
+        std::thread::sleep(Duration::from_millis(500));
+        let honest = Client::connect(&format!("omt://127.0.0.1:{}", server.port())).unwrap();
+        let start = Instant::now();
+        honest.register("HONEST (cam)", 6401);
+        wait_until(|| {
+            server
+                .entries()
+                .iter()
+                .any(|e| e.address.full_name == "HONEST (cam)")
+        });
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "registration took {:?}",
+            start.elapsed()
+        );
+        drop(flooder.join().unwrap());
+        drop(silent);
+    }
+
+    #[test]
+    fn a_server_that_stops_reading_does_not_hang_the_client() {
+        // Bug hunt #6: client writes had no timeout and happen with its state
+        // locked, so a server that stopped reading hung register and drop.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("omt://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let c = Client::connect(&url).unwrap();
+        let (held, _) = listener.accept().unwrap();
+        let name = format!("{} (big)", "B".repeat(60_000));
+        // Register until a call has to wait: the socket buffers are full and
+        // the write timed out. That call, and dropping the client, must end.
+        let mut slowest = Duration::ZERO;
+        for i in 0..2000 {
+            let start = Instant::now();
+            c.register(&format!("{name}{i}"), 6400);
+            slowest = slowest.max(start.elapsed());
+            if slowest > Duration::from_secs(1) {
+                break;
+            }
+        }
+        assert!(slowest > Duration::from_secs(1), "the buffers never filled");
+        assert!(
+            slowest < Duration::from_secs(5),
+            "a register took {slowest:?}"
+        );
+        let start = Instant::now();
+        drop(c);
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "drop took {:?}",
+            start.elapsed()
+        );
+        drop(held);
+    }
 
     #[test]
     fn xml_round_trip() {

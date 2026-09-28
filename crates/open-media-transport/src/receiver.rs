@@ -36,20 +36,44 @@
 //! side connection, ignores every later redirect (`OMTReceive.cs:579-594`,
 //! `OMTRedirect.cs:84-90`). Here an empty first redirect is a no-op.
 //!
+//! An unreadable redirect message counts as a cancel, as in libomtnet
+//! ([`crate::redirect::heard`]), and a redirect to an address that cannot
+//! be parsed leaves the receiver disconnected, retrying, as libomtnet finds
+//! nothing to connect to (`OMTDiscovery.cs:389-400`, `OMTReceive.cs:328-349`).
+//!
+//! **Which redirects are followed** is [`ReceiverConfig::redirects`]. A
+//! redirect can point a receiver anywhere, and anyone who can reach the
+//! sender, or sit between it and the receiver, can send one. libomtnet
+//! follows every redirect ([`RedirectPolicy::Any`]); the default here,
+//! [`RedirectPolicy::SameHost`], follows one only to the machine the
+//! original sender is on, which is what a virtual source such as vMix's
+//! needs. A receiver whose policy refuses a redirect stays with the original
+//! sender.
+//!
+//! **Queueing.** Frames wait for the application in a bounded queue: at most
+//! [`MAX_QUEUED_VIDEO`] video, [`MAX_QUEUED_AUDIO`] audio and
+//! [`MAX_QUEUED_METADATA`] metadata frames, libomtnet's pool sizes
+//! (`OMTConstants.cs:54,59,68`). As in libomtnet, a frame that arrives when
+//! its kind is full is dropped (`OMTChannel.cs:470-488,402-405`) and counted
+//! in [`ChannelStats::dropped`]; the connection stays open. Protocol messages
+//! still take effect when their frame is dropped. [`Event::Connected`],
+//! [`Event::Closed`] and [`Event::Redirect`] are never dropped.
+//!
 //! **Dropping** a receiver shuts its sockets down and waits at most
 //! [`DROP_TIMEOUT`] for its threads; one still busy after that (say, in a
 //! connection attempt) finishes on its own and closes what it opened.
 
+use std::collections::VecDeque;
 use std::io::{self, Write};
-use std::net::{Shutdown, SocketAddr, TcpStream};
+use std::net::{IpAddr, Shutdown, SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Condvar, Mutex, Weak};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use crate::address::{Address, Directory};
 use crate::command::{classify, Command, Message, Quality, Tally};
-use crate::frame::ExtendedHeader;
+use crate::frame::{ExtendedHeader, FrameType};
 use crate::redirect::{self, Watcher};
 use crate::sender::join_bounded;
 pub use crate::sender::DROP_TIMEOUT;
@@ -62,6 +86,18 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 /// libomtnet does not wait: its first attempt usually finds nothing and the
 /// next `Receive` call tries again.
 pub const RESOLVE_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a receiver still connected waits for a redirect's target to be
+/// discovered before deciding whether its policy refuses it.
+const REFUSAL_WAIT: Duration = Duration::from_secs(2);
+/// Video frames held for the application (`VIDEO_FRAME_POOL_COUNT`,
+/// `OMTConstants.cs:54`).
+pub const MAX_QUEUED_VIDEO: usize = 4;
+/// Audio frames held for the application (`AUDIO_FRAME_POOL_COUNT`,
+/// `OMTConstants.cs:59`).
+pub const MAX_QUEUED_AUDIO: usize = 10;
+/// Metadata frames held for the application (`METADATA_MAX_COUNT`,
+/// `OMTConstants.cs:68`).
+pub const MAX_QUEUED_METADATA: usize = 60;
 
 /// What to ask the sender for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -78,8 +114,38 @@ pub struct ReceiverConfig {
     pub tally: Tally,
     /// Reconnect automatically when a connection drops.
     pub reconnect: bool,
-    /// Follow redirects (§9). libomtnet always does.
-    pub follow_redirects: bool,
+    /// Which redirects to follow (§9).
+    pub redirects: RedirectPolicy,
+}
+
+/// Which redirects (§9) a receiver follows.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum RedirectPolicy {
+    /// Every one, wherever it points: libomtnet's behaviour.
+    Any,
+    /// Only to the machine the original sender is on: the redirect target
+    /// must resolve to the IP address the receiver reached the original
+    /// sender at (any loopback address counts for a sender on loopback). A
+    /// name or URL is still looked up, but nothing else is connected to.
+    #[default]
+    SameHost,
+    /// None.
+    Never,
+}
+
+impl RedirectPolicy {
+    /// Whether `target` may be connected to for a redirect heard from a
+    /// sender reached at `origin`.
+    fn allows(self, origin: Option<IpAddr>, target: IpAddr) -> bool {
+        match self {
+            RedirectPolicy::Any => true,
+            RedirectPolicy::Never => false,
+            RedirectPolicy::SameHost => origin.is_some_and(|o| {
+                let (o, t) = (o.to_canonical(), target.to_canonical());
+                o == t || (o.is_loopback() && t.is_loopback())
+            }),
+        }
+    }
 }
 
 impl Default for ReceiverConfig {
@@ -91,7 +157,7 @@ impl Default for ReceiverConfig {
             quality: Quality::Default,
             tally: Tally::default(),
             reconnect: true,
-            follow_redirects: true,
+            redirects: RedirectPolicy::default(),
         }
     }
 }
@@ -125,8 +191,10 @@ pub enum Event {
 pub struct ChannelStats {
     /// Bytes read from the socket.
     pub bytes: u64,
-    /// Complete frames, protocol messages included.
+    /// Complete frames, protocol messages included, dropped ones too.
     pub frames: u64,
+    /// Frames dropped because the application was not keeping up.
+    pub dropped: u64,
 }
 
 /// Counters since the receiver started, for [`Receiver::stats`].
@@ -147,6 +215,7 @@ pub struct ReceiverStats {
 struct Counters {
     bytes: [AtomicU64; 2],
     frames: [AtomicU64; 2],
+    dropped: [AtomicU64; 2],
     reconnects: AtomicU64,
     redirects: AtomicU64,
 }
@@ -158,6 +227,87 @@ pub enum ReceiveError {
     Io(io::Error),
     /// The peer sent something that is not a valid OMT stream.
     Protocol(Error),
+}
+
+#[derive(Default)]
+struct QueueState {
+    events: VecDeque<Event>,
+    /// Queued frames of each kind: video, audio, metadata.
+    held: [usize; 3],
+    /// The [`Receiver`] is gone; nothing will read the queue again.
+    closed: bool,
+}
+
+/// The events waiting for the application, bounded per frame kind.
+#[derive(Default)]
+struct EventQueue {
+    state: Mutex<QueueState>,
+    ready: Condvar,
+}
+
+/// Which `held` slot and limit a frame counts against.
+fn kind(f: &OwnedFrame) -> (usize, usize) {
+    match f.header.frame_type {
+        FrameType::Video => (0, MAX_QUEUED_VIDEO),
+        FrameType::Audio => (1, MAX_QUEUED_AUDIO),
+        _ => (2, MAX_QUEUED_METADATA),
+    }
+}
+
+/// What [`EventQueue::push`] did with an event.
+#[derive(Debug, PartialEq, Eq)]
+enum Pushed {
+    Queued,
+    /// Its kind was full.
+    Dropped,
+    /// The receiver is gone.
+    Closed,
+}
+
+impl EventQueue {
+    fn push(&self, e: Event) -> Pushed {
+        let mut s = self.state.lock().unwrap();
+        if s.closed {
+            return Pushed::Closed;
+        }
+        if let Event::Frame(_, f) = &e {
+            let (slot, max) = kind(f);
+            if s.held[slot] >= max {
+                return Pushed::Dropped;
+            }
+            s.held[slot] += 1;
+        }
+        s.events.push_back(e);
+        drop(s);
+        self.ready.notify_one();
+        Pushed::Queued
+    }
+
+    fn pop(&self, timeout: Duration) -> Option<Event> {
+        let deadline = Instant::now() + timeout;
+        let mut s = self.state.lock().unwrap();
+        loop {
+            if let Some(e) = s.events.pop_front() {
+                if let Event::Frame(_, f) = &e {
+                    s.held[kind(f).0] -= 1;
+                }
+                return Some(e);
+            }
+            let left = deadline.checked_duration_since(Instant::now())?;
+            if left.is_zero() {
+                return None;
+            }
+            s = self.ready.wait_timeout(s, left).unwrap().0;
+        }
+    }
+
+    /// Discards what is queued and refuses more.
+    fn close(&self) {
+        let mut s = self.state.lock().unwrap();
+        s.closed = true;
+        s.events.clear();
+        s.held = [0; 3];
+    }
 }
 
 struct Connection {
@@ -204,6 +354,9 @@ struct Connections {
     video: Option<Connection>,
     audio: Option<Connection>,
     peer: Option<SocketAddr>,
+    /// Where the original sender was last reached, for
+    /// [`RedirectPolicy::SameHost`].
+    origin: Option<IpAddr>,
 }
 
 /// Redirect and shutdown state, guarded together so the supervisor can
@@ -228,7 +381,7 @@ struct Inner {
     directory: Mutex<Option<Arc<Directory>>>,
     config: Mutex<ReceiverConfig>,
     conns: Mutex<Connections>,
-    events: mpsc::Sender<Event>,
+    events: EventQueue,
     ctl: Mutex<Control>,
     wake: Condvar,
     me: Weak<Inner>,
@@ -238,7 +391,6 @@ struct Inner {
 /// A connection to one sender.
 pub struct Receiver {
     inner: Arc<Inner>,
-    events: mpsc::Receiver<Event>,
     supervisor: Option<JoinHandle<()>>,
 }
 
@@ -279,14 +431,13 @@ impl Receiver {
         directory: Option<Arc<Directory>>,
         first_must_succeed: bool,
     ) -> io::Result<Receiver> {
-        let (tx, events) = mpsc::channel();
         let inner = Arc::new_cyclic(|me| Inner {
             original_text: address.to_string(),
             original: address,
             directory: Mutex::new(directory),
             config: Mutex::new(config),
             conns: Mutex::new(Connections::default()),
-            events: tx,
+            events: EventQueue::default(),
             ctl: Mutex::new(Control::default()),
             wake: Condvar::new(),
             me: me.clone(),
@@ -311,14 +462,13 @@ impl Receiver {
         };
         Ok(Receiver {
             inner,
-            events,
             supervisor: Some(supervisor),
         })
     }
 
     /// Waits up to `timeout` for the next event.
     pub fn recv_timeout(&self, timeout: Duration) -> Option<Event> {
-        self.events.recv_timeout(timeout).ok()
+        self.inner.events.pop(timeout)
     }
 
     /// Sends a command to the sender, e.g. a tally or quality change. Tally,
@@ -362,7 +512,8 @@ impl Receiver {
         &self.inner.original
     }
 
-    /// The redirect being followed, if any (§9).
+    /// The redirect in force, if any (§9). With a [`RedirectPolicy`] that
+    /// refuses it, the receiver is still on the original sender.
     pub fn redirect(&self) -> Option<String> {
         self.inner.ctl.lock().unwrap().redirect.clone()
     }
@@ -373,6 +524,7 @@ impl Receiver {
         let channel = |i: usize| ChannelStats {
             bytes: c.bytes[i].load(Ordering::Relaxed),
             frames: c.frames[i].load(Ordering::Relaxed),
+            dropped: c.dropped[i].load(Ordering::Relaxed),
         };
         ReceiverStats {
             video: channel(0),
@@ -396,6 +548,7 @@ impl Drop for Receiver {
             c.closing = true;
             c.side.take()
         };
+        self.inner.events.close();
         self.inner.wake.notify_all();
         let deadline = Instant::now() + DROP_TIMEOUT;
         // Sockets first, so no thread stays blocked on a stalled sender.
@@ -423,7 +576,17 @@ impl Inner {
     }
 
     fn close_all(&self, deadline: Instant) {
-        let old = std::mem::take(&mut *self.conns.lock().unwrap());
+        let old = {
+            let mut c = self.conns.lock().unwrap();
+            let origin = c.origin;
+            std::mem::replace(
+                &mut *c,
+                Connections {
+                    origin,
+                    ..Connections::default()
+                },
+            )
+        };
         close_each([old.video, old.audio].into_iter().flatten(), deadline);
     }
 
@@ -439,11 +602,16 @@ impl Inner {
     }
 
     /// Where to connect now: the redirect if one is followed, otherwise the
-    /// original address (`OMTReceive.cs:287-294`).
-    fn target(&self) -> Address {
-        let r = self.ctl.lock().unwrap().redirect.clone();
-        r.and_then(|r| Address::parse(&r).ok())
-            .unwrap_or_else(|| self.original.clone())
+    /// original address (`OMTReceive.cs:287-294`), and whether it is a
+    /// redirect. A redirect that is not an address is an error, not the
+    /// original (bug hunt #8).
+    fn target(&self) -> io::Result<(Address, bool)> {
+        match self.ctl.lock().unwrap().redirect.clone() {
+            None => Ok((self.original.clone(), false)),
+            Some(r) => Address::parse(&r).map(|a| (a, true)).map_err(|e| {
+                io::Error::new(io::ErrorKind::NotFound, format!("redirect {r:?}: {e}"))
+            }),
+        }
     }
 
     /// Resolves `target` afresh. A name may be waited for.
@@ -463,12 +631,42 @@ impl Inner {
         }
     }
 
+    /// Whether the redirect being followed resolves only to addresses the
+    /// policy refuses, so the receiver would stay where it is. A name is
+    /// waited for up to [`REFUSAL_WAIT`] while the current connections stay
+    /// up: a redirect usually arrives the moment a receiver connects, before
+    /// discovery has seen its target. A target still not found is not
+    /// refused: connecting will tell.
+    fn refused_now(&self) -> bool {
+        let policy = self.config.lock().unwrap().redirects;
+        if policy == RedirectPolicy::Any {
+            return false;
+        }
+        let Ok((target, true)) = self.target() else {
+            return false;
+        };
+        let Ok(addrs) = self.resolve(&target, Some(REFUSAL_WAIT)) else {
+            return false;
+        };
+        let origin = self.conns.lock().unwrap().origin;
+        addrs.iter().all(|a| !policy.allows(origin, a.ip()))
+    }
+
     /// Opens every connection the config asks for, with its §4.3 sequence,
     /// at the current target.
     fn open_all(&self, wait: Option<Duration>) -> io::Result<()> {
-        let target = self.target();
-        let addrs = self.resolve(&target, wait)?;
+        let (target, mut redirected) = self.target()?;
+        let mut addrs = self.resolve(&target, wait)?;
         let cfg = *self.config.lock().unwrap();
+        if redirected {
+            let origin = self.conns.lock().unwrap().origin;
+            addrs.retain(|a| cfg.redirects.allows(origin, a.ip()));
+            if addrs.is_empty() {
+                // Refused: stay with the original sender.
+                redirected = false;
+                addrs = self.resolve(&self.original, wait)?;
+            }
+        }
         let mut conns = Connections::default();
         // Like `Socket.BeginConnect(IPAddress[], port)` (`OMTReceive.cs:391`),
         // try each address in turn; the second connection goes to the one
@@ -535,7 +733,13 @@ impl Inner {
             close_each([conns.video, conns.audio].into_iter().flatten(), deadline);
             return Err(io::Error::new(io::ErrorKind::Interrupted, "closing"));
         }
-        *self.conns.lock().unwrap() = conns;
+        let mut c = self.conns.lock().unwrap();
+        conns.origin = if redirected {
+            c.origin
+        } else {
+            conns.peer.map(|p| p.ip())
+        };
+        *c = conns;
         Ok(())
     }
 
@@ -564,7 +768,7 @@ impl Inner {
             .spawn(move || read_loop(rs, channel, limits, me, ra, rstop, stats))?;
         // Recorded before the event, so `peer_addr` agrees with it.
         self.conns.lock().unwrap().peer = Some(addr);
-        let _ = self.events.send(Event::Connected(channel));
+        self.events.push(Event::Connected(channel));
         Ok(Connection {
             stream,
             alive,
@@ -576,7 +780,7 @@ impl Inner {
     /// A redirect message arrived, on a main connection or (`from_side`) on
     /// the side connection to the original address.
     fn redirect_heard(&self, from_side: bool, address: String) {
-        if !self.config.lock().unwrap().follow_redirects {
+        if self.config.lock().unwrap().redirects == RedirectPolicy::Never {
             return;
         }
         let mut c = self.ctl.lock().unwrap();
@@ -605,13 +809,18 @@ impl Inner {
         c.retarget = true;
         drop(c);
         self.stats.redirects.fetch_add(1, Ordering::Relaxed);
-        let _ = self.events.send(Event::Redirect(new));
+        self.events.push(Event::Redirect(new));
         self.wake.notify_all();
     }
 
     fn start_side(&self) {
         let me = self.me.clone();
-        let directory = self.directory.lock().unwrap().clone();
+        // A name is looked up in this receiver's directory, not in one the
+        // side connection would start for itself (bug hunt #9).
+        let directory = match &self.original {
+            Address::Name(_) => self.directory().ok(),
+            _ => self.directory.lock().unwrap().clone(),
+        };
         let side = Watcher::start(self.original.clone(), directory, move |a| {
             if let Some(i) = me.upgrade() {
                 i.redirect_heard(true, a);
@@ -657,6 +866,10 @@ impl Inner {
             if want_side {
                 self.start_side();
             }
+            if retarget && self.connected() && self.refused_now() {
+                // Staying with the original sender: no need to drop it.
+                continue;
+            }
             let reconnect = self.config.lock().unwrap().reconnect;
             let due = last_attempt.elapsed() >= RETRY_INTERVAL;
             if retarget || ((reconnect || pending) && due && !self.connected()) {
@@ -684,9 +897,6 @@ fn read_loop(
         Channel::Video => 0,
         Channel::Audio => 1,
     };
-    let Some(tx) = inner.upgrade().map(|i| i.events.clone()) else {
-        return;
-    };
     let mut deframer = Deframer::new(limits);
     // libomtnet reads at most 128 KiB per call (`OMTConstants.cs:44`).
     let mut buf = vec![0u8; 128 * 1024];
@@ -704,13 +914,20 @@ fn read_loop(
                 Ok(Some(f)) => {
                     stats.frames[slot].fetch_add(1, Ordering::Relaxed);
                     let heard = match (&f.ext, classify(&f.data)) {
-                        (ExtendedHeader::None, Message::Redirect(x)) => redirect::parse(x),
+                        (ExtendedHeader::None, Message::Redirect(x)) => Some(redirect::heard(x)),
                         _ => None,
                     };
-                    if tx.send(Event::Frame(channel, f)).is_err() {
+                    let Some(i) = inner.upgrade() else {
                         break 'read None; // receiver dropped
+                    };
+                    match i.events.push(Event::Frame(channel, f)) {
+                        Pushed::Queued => {}
+                        Pushed::Dropped => {
+                            stats.dropped[slot].fetch_add(1, Ordering::Relaxed);
+                        }
+                        Pushed::Closed => break 'read None,
                     }
-                    if let (Some(a), Some(i)) = (heard, inner.upgrade()) {
+                    if let Some(a) = heard {
                         i.redirect_heard(false, a);
                     }
                 }
@@ -723,9 +940,9 @@ fn read_loop(
         }
     };
     alive.store(false, Ordering::SeqCst);
-    let _ = tx.send(Event::Closed(channel, reason));
-    // Let the supervisor reconnect without waiting for its next tick.
     if let Some(i) = inner.upgrade() {
+        i.events.push(Event::Closed(channel, reason));
+        // Let the supervisor reconnect without waiting for its next tick.
         i.wake.notify_all();
     }
 }
@@ -904,15 +1121,36 @@ mod tests {
 
     #[test]
     fn drop_is_bounded_while_connecting() {
-        // The sender went away; the supervisor keeps trying while we drop.
+        // The sender went away; the supervisor is in a connection attempt
+        // while we drop. The name moves to a documentation address (TEST-NET-1,
+        // RFC 5737) where the attempt hangs until its timeout. A freed local
+        // port would not do: another test's listener can get it, and this
+        // receiver would connect there.
+        use crate::discovery::{Source, SourceEvent};
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
+        let source = |ip: &str, port| {
+            SourceEvent::Resolved(Source {
+                full_name: "TEST (gone)".into(),
+                host: "test-omt.local.".into(),
+                port,
+                addresses: vec![ip.parse().unwrap()],
+            })
+        };
+        let dir = Arc::new(Directory::manual());
+        dir.apply(source("127.0.0.1", listener.local_addr().unwrap().port()));
         let cfg = ReceiverConfig {
             audio: false,
             ..ReceiverConfig::default()
         };
-        let r = Receiver::connect(addr, cfg).unwrap();
-        drop(listener);
+        let r = Receiver::connect_address(
+            Address::parse("TEST (gone)").unwrap(),
+            cfg,
+            Some(dir.clone()),
+        )
+        .unwrap();
+        let (held, _) = listener.accept().unwrap();
+        dir.apply(source("192.0.2.1", 9));
+        drop(held);
         std::thread::sleep(Duration::from_millis(1200));
         let start = Instant::now();
         drop(r);
@@ -950,6 +1188,74 @@ mod tests {
             Command::SubscribeMetadata
         );
         assert!(Receiver::connect_to("omt://127.0.0.1", cfg).is_err());
+    }
+
+    #[test]
+    fn a_flooding_sender_cannot_grow_the_queue_without_bound() {
+        // Security review PoC A: a sender floods 1 MB metadata frames at a
+        // receiver whose application is not reading. The queue must stop at
+        // libomtnet's pool sizes and count the rest as dropped.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cfg = ReceiverConfig {
+            audio: false,
+            reconnect: false,
+            ..ReceiverConfig::default()
+        };
+        let r = Receiver::connect(addr, cfg).unwrap();
+        let (mut s, _) = listener.accept().unwrap();
+        const SENT: u64 = 200;
+        let xml = vec![b'x'; 1_000_000];
+        let mut one = Vec::new();
+        frame::write_metadata(0, &xml, &mut one);
+        for _ in 0..SENT {
+            s.write_all(&one).unwrap();
+        }
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while r.stats().video.frames < SENT {
+            assert!(Instant::now() < deadline, "sent frames not all read");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let mut frames = 0;
+        while let Some(e) = r.recv_timeout(Duration::from_millis(50)) {
+            if let Event::Frame(..) = e {
+                frames += 1;
+            }
+        }
+        assert_eq!(frames, MAX_QUEUED_METADATA as u64);
+        assert_eq!(r.stats().video.dropped, SENT - frames);
+        assert!(
+            r.is_connected(),
+            "dropping frames does not close the connection"
+        );
+    }
+
+    #[test]
+    fn queue_limits_each_frame_kind_and_never_drops_control_events() {
+        let q = EventQueue::default();
+        let meta = || {
+            let mut out = Vec::new();
+            frame::write_metadata(0, b"<a/>", &mut out);
+            let mut d = Deframer::new(Limits::VIDEO);
+            d.push(&out);
+            d.next_frame().unwrap().unwrap()
+        };
+        for i in 0..MAX_QUEUED_METADATA + 5 {
+            let want = if i < MAX_QUEUED_METADATA {
+                Pushed::Queued
+            } else {
+                Pushed::Dropped
+            };
+            assert_eq!(q.push(Event::Frame(Channel::Video, meta())), want);
+        }
+        assert_eq!(q.push(Event::Connected(Channel::Audio)), Pushed::Queued);
+        assert_eq!(q.push(Event::Redirect(None)), Pushed::Queued);
+        // Taking one frame makes room for one more.
+        assert!(matches!(q.pop(Duration::ZERO), Some(Event::Frame(..))));
+        assert_eq!(q.push(Event::Frame(Channel::Video, meta())), Pushed::Queued);
+        q.close();
+        assert_eq!(q.push(Event::Redirect(None)), Pushed::Closed);
+        assert!(q.pop(Duration::ZERO).is_none());
     }
 
     #[test]
