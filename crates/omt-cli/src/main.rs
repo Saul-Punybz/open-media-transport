@@ -3,7 +3,7 @@
 //! ```text
 //! omt list [--seconds N]
 //! omt send [--name NAME] [--size WxH] [--fps F] [--seconds N] [--redirect SOURCE] [--10bit] [--threads N]
-//! omt recv SOURCE [--seconds N] [--snapshot FILE.bmp|FILE.png] [--preview]
+//! omt recv SOURCE [--seconds N] [--snapshot FILE.bmp|FILE.png] [--preview] [--redirects any|same-host|never]
 //! omt check SOURCE [--seconds N] [--json]
 //! omt discovery-server [--port N] [--seconds N]
 //! ```
@@ -33,7 +33,7 @@ use open_media_transport::frame::{ExtendedHeader, VideoFlags};
 use open_media_transport::media::{
     decode_audio, AudioFrame, MediaDecoder, PreferredVideoFormat, VideoFrame,
 };
-use open_media_transport::receiver::{Event, Receiver, ReceiverConfig};
+use open_media_transport::receiver::{Event, Receiver, ReceiverConfig, RedirectPolicy};
 use open_media_transport::sender::{Sender, SenderConfig, SenderInfo, VideoParams};
 use vmx_codec::{Frame, PixelFormat};
 
@@ -52,10 +52,13 @@ USAGE:
       --threads sets the encoder threads (default 1); raise it when send
       warns that it cannot keep up.
   omt recv SOURCE [--seconds N] [--snapshot FILE.bmp|FILE.png] [--preview]
+                 [--redirects any|same-host|never]
       Connect to SOURCE (a name from `omt list`, omt://host:port, or
       host:port), print statistics every second, and optionally save the
       last frame: .png keeps 10-bit sources at 16 bits per sample and keeps
-      alpha; .bmp is 8-bit RGB. Follows redirects.
+      alpha; .bmp is 8-bit RGB. Follows every redirect, as libomtnet does;
+      --redirects same-host follows only those to the sender's own machine
+      (the library's default) and never none.
   omt check SOURCE [--seconds N] [--json]
       Connect to SOURCE, watch it for a few seconds (default 5), and report its
       health: does it connect, how many frames per second arrive versus what it
@@ -408,7 +411,12 @@ struct Window {
 fn recv(args: &[String]) -> Result<()> {
     check_args(
         args,
-        &["--seconds", "--snapshot", "--discovery-server"],
+        &[
+            "--seconds",
+            "--snapshot",
+            "--discovery-server",
+            "--redirects",
+        ],
         &["--preview", "--no-mdns"],
         1,
     )?;
@@ -419,12 +427,19 @@ fn recv(args: &[String]) -> Result<()> {
     let limit = seconds(args)?.map(Duration::from_secs);
     let snapshot = opt(args, "--snapshot");
     let preview = args.iter().any(|a| a == "--preview");
+    let redirects = match opt(args, "--redirects").unwrap_or("any") {
+        "any" => RedirectPolicy::Any,
+        "same-host" => RedirectPolicy::SameHost,
+        "never" => RedirectPolicy::Never,
+        other => return Err(format!("--redirects {other}: use any, same-host or never")),
+    };
     println!("connecting to {source}");
     let rx = connect(
         source,
         ReceiverConfig {
             preview,
             quality: Quality::Default,
+            redirects,
             ..ReceiverConfig::default()
         },
         args,
@@ -579,6 +594,8 @@ fn check(args: &[String]) -> Result<()> {
         source,
         ReceiverConfig {
             quality: Quality::Default,
+            // What a libomtnet application would see.
+            redirects: RedirectPolicy::Any,
             ..ReceiverConfig::default()
         },
         args,

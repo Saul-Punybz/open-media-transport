@@ -36,6 +36,20 @@
 //! side connection, ignores every later redirect (`OMTReceive.cs:579-594`,
 //! `OMTRedirect.cs:84-90`). Here an empty first redirect is a no-op.
 //!
+//! An unreadable redirect message counts as a cancel, as in libomtnet
+//! ([`crate::redirect::heard`]), and a redirect to an address that cannot
+//! be parsed leaves the receiver disconnected, retrying, as libomtnet finds
+//! nothing to connect to (`OMTDiscovery.cs:389-400`, `OMTReceive.cs:328-349`).
+//!
+//! **Which redirects are followed** is [`ReceiverConfig::redirects`]. A
+//! redirect can point a receiver anywhere, and anyone who can reach the
+//! sender, or sit between it and the receiver, can send one. libomtnet
+//! follows every redirect ([`RedirectPolicy::Any`]); the default here,
+//! [`RedirectPolicy::SameHost`], follows one only to the machine the
+//! original sender is on, which is what a virtual source such as vMix's
+//! needs. A receiver whose policy refuses a redirect stays with the original
+//! sender.
+//!
 //! **Queueing.** Frames wait for the application in a bounded queue: at most
 //! [`MAX_QUEUED_VIDEO`] video, [`MAX_QUEUED_AUDIO`] audio and
 //! [`MAX_QUEUED_METADATA`] metadata frames, libomtnet's pool sizes
@@ -51,7 +65,7 @@
 
 use std::collections::VecDeque;
 use std::io::{self, Write};
-use std::net::{Shutdown, SocketAddr, TcpStream};
+use std::net::{IpAddr, Shutdown, SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::thread::JoinHandle;
@@ -97,8 +111,38 @@ pub struct ReceiverConfig {
     pub tally: Tally,
     /// Reconnect automatically when a connection drops.
     pub reconnect: bool,
-    /// Follow redirects (§9). libomtnet always does.
-    pub follow_redirects: bool,
+    /// Which redirects to follow (§9).
+    pub redirects: RedirectPolicy,
+}
+
+/// Which redirects (§9) a receiver follows.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum RedirectPolicy {
+    /// Every one, wherever it points: libomtnet's behaviour.
+    Any,
+    /// Only to the machine the original sender is on: the redirect target
+    /// must resolve to the IP address the receiver reached the original
+    /// sender at (any loopback address counts for a sender on loopback). A
+    /// name or URL is still looked up, but nothing else is connected to.
+    #[default]
+    SameHost,
+    /// None.
+    Never,
+}
+
+impl RedirectPolicy {
+    /// Whether `target` may be connected to for a redirect heard from a
+    /// sender reached at `origin`.
+    fn allows(self, origin: Option<IpAddr>, target: IpAddr) -> bool {
+        match self {
+            RedirectPolicy::Any => true,
+            RedirectPolicy::Never => false,
+            RedirectPolicy::SameHost => origin.is_some_and(|o| {
+                let (o, t) = (o.to_canonical(), target.to_canonical());
+                o == t || (o.is_loopback() && t.is_loopback())
+            }),
+        }
+    }
 }
 
 impl Default for ReceiverConfig {
@@ -110,7 +154,7 @@ impl Default for ReceiverConfig {
             quality: Quality::Default,
             tally: Tally::default(),
             reconnect: true,
-            follow_redirects: true,
+            redirects: RedirectPolicy::default(),
         }
     }
 }
@@ -307,6 +351,9 @@ struct Connections {
     video: Option<Connection>,
     audio: Option<Connection>,
     peer: Option<SocketAddr>,
+    /// Where the original sender was last reached, for
+    /// [`RedirectPolicy::SameHost`].
+    origin: Option<IpAddr>,
 }
 
 /// Redirect and shutdown state, guarded together so the supervisor can
@@ -525,7 +572,17 @@ impl Inner {
     }
 
     fn close_all(&self, deadline: Instant) {
-        let old = std::mem::take(&mut *self.conns.lock().unwrap());
+        let old = {
+            let mut c = self.conns.lock().unwrap();
+            let origin = c.origin;
+            std::mem::replace(
+                &mut *c,
+                Connections {
+                    origin,
+                    ..Connections::default()
+                },
+            )
+        };
         close_each([old.video, old.audio].into_iter().flatten(), deadline);
     }
 
@@ -541,11 +598,16 @@ impl Inner {
     }
 
     /// Where to connect now: the redirect if one is followed, otherwise the
-    /// original address (`OMTReceive.cs:287-294`).
-    fn target(&self) -> Address {
-        let r = self.ctl.lock().unwrap().redirect.clone();
-        r.and_then(|r| Address::parse(&r).ok())
-            .unwrap_or_else(|| self.original.clone())
+    /// original address (`OMTReceive.cs:287-294`), and whether it is a
+    /// redirect. A redirect that is not an address is an error, not the
+    /// original (bug hunt #8).
+    fn target(&self) -> io::Result<(Address, bool)> {
+        match self.ctl.lock().unwrap().redirect.clone() {
+            None => Ok((self.original.clone(), false)),
+            Some(r) => Address::parse(&r).map(|a| (a, true)).map_err(|e| {
+                io::Error::new(io::ErrorKind::NotFound, format!("redirect {r:?}: {e}"))
+            }),
+        }
     }
 
     /// Resolves `target` afresh. A name may be waited for.
@@ -568,9 +630,18 @@ impl Inner {
     /// Opens every connection the config asks for, with its §4.3 sequence,
     /// at the current target.
     fn open_all(&self, wait: Option<Duration>) -> io::Result<()> {
-        let target = self.target();
-        let addrs = self.resolve(&target, wait)?;
+        let (target, mut redirected) = self.target()?;
+        let mut addrs = self.resolve(&target, wait)?;
         let cfg = *self.config.lock().unwrap();
+        if redirected {
+            let origin = self.conns.lock().unwrap().origin;
+            addrs.retain(|a| cfg.redirects.allows(origin, a.ip()));
+            if addrs.is_empty() {
+                // Refused: stay with the original sender.
+                redirected = false;
+                addrs = self.resolve(&self.original, wait)?;
+            }
+        }
         let mut conns = Connections::default();
         // Like `Socket.BeginConnect(IPAddress[], port)` (`OMTReceive.cs:391`),
         // try each address in turn; the second connection goes to the one
@@ -637,7 +708,13 @@ impl Inner {
             close_each([conns.video, conns.audio].into_iter().flatten(), deadline);
             return Err(io::Error::new(io::ErrorKind::Interrupted, "closing"));
         }
-        *self.conns.lock().unwrap() = conns;
+        let mut c = self.conns.lock().unwrap();
+        conns.origin = if redirected {
+            c.origin
+        } else {
+            conns.peer.map(|p| p.ip())
+        };
+        *c = conns;
         Ok(())
     }
 
@@ -678,7 +755,7 @@ impl Inner {
     /// A redirect message arrived, on a main connection or (`from_side`) on
     /// the side connection to the original address.
     fn redirect_heard(&self, from_side: bool, address: String) {
-        if !self.config.lock().unwrap().follow_redirects {
+        if self.config.lock().unwrap().redirects == RedirectPolicy::Never {
             return;
         }
         let mut c = self.ctl.lock().unwrap();
@@ -713,7 +790,12 @@ impl Inner {
 
     fn start_side(&self) {
         let me = self.me.clone();
-        let directory = self.directory.lock().unwrap().clone();
+        // A name is looked up in this receiver's directory, not in one the
+        // side connection would start for itself (bug hunt #9).
+        let directory = match &self.original {
+            Address::Name(_) => self.directory().ok(),
+            _ => self.directory.lock().unwrap().clone(),
+        };
         let side = Watcher::start(self.original.clone(), directory, move |a| {
             if let Some(i) = me.upgrade() {
                 i.redirect_heard(true, a);
@@ -803,7 +885,7 @@ fn read_loop(
                 Ok(Some(f)) => {
                     stats.frames[slot].fetch_add(1, Ordering::Relaxed);
                     let heard = match (&f.ext, classify(&f.data)) {
-                        (ExtendedHeader::None, Message::Redirect(x)) => redirect::parse(x),
+                        (ExtendedHeader::None, Message::Redirect(x)) => Some(redirect::heard(x)),
                         _ => None,
                     };
                     let Some(i) = inner.upgrade() else {

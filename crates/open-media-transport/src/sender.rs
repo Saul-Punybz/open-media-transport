@@ -58,7 +58,7 @@ use std::{error, fmt};
 use socket2::{Domain, Protocol, Socket, Type};
 use vmx_codec::{Decoder, Encoder, EncoderConfig, Profile};
 
-use crate::address::Address;
+use crate::address::{Address, Directory};
 use crate::command::{classify, Command, Message, Quality, Tally};
 use crate::discovery::{self, Discovery};
 use crate::frame::{
@@ -341,6 +341,8 @@ pub struct Sender {
     port: u16,
     full_name: Option<String>,
     discovery: Option<Arc<Discovery>>,
+    /// Built on `discovery` when a redirect watcher first needs a name.
+    directory: Mutex<Option<Arc<Directory>>>,
     accept: Option<JoinHandle<()>>,
     /// Dropping the sender half stops the janitor.
     janitor: Option<(mpsc::Sender<()>, JoinHandle<()>)>,
@@ -418,6 +420,7 @@ impl Sender {
             port,
             full_name,
             discovery,
+            directory: Mutex::new(None),
             accept: Some(accept),
             encoder_threads: config.encoder_threads.max(1),
             video: Mutex::new(VideoState {
@@ -476,9 +479,14 @@ impl Sender {
                 r.generation += 1;
                 let (weak, generation) = (Arc::downgrade(&self.shared), r.generation);
                 if let Ok(target) = Address::parse(n) {
-                    r.watcher =
-                        Watcher::start(target, None, move |a| upstream_heard(&weak, generation, a))
-                            .ok();
+                    let directory = match target {
+                        Address::Name(_) => self.directory(),
+                        _ => None,
+                    };
+                    r.watcher = Watcher::start(target, directory, move |a| {
+                        upstream_heard(&weak, generation, a)
+                    })
+                    .ok();
                 }
             }
             (r.xml(), old)
@@ -488,6 +496,18 @@ impl Sender {
         let mut out = Vec::new();
         frame::write_metadata(0, xml.as_bytes(), &mut out);
         self.shared.broadcast_metadata(Arc::new(out));
+    }
+
+    /// A directory on the sender's own [`Discovery`], so a redirect watcher
+    /// looking up a name does not start an mDNS responder of its own (bug
+    /// hunt #9). `None` for a sender that does not announce.
+    fn directory(&self) -> Option<Arc<Directory>> {
+        let d = self.discovery.as_ref()?;
+        let mut dir = self.directory.lock().unwrap();
+        if dir.is_none() {
+            *dir = Directory::with_shared(d.clone()).ok().map(Arc::new);
+        }
+        dir.clone()
     }
 
     /// The address receivers are being redirected to, if any: the one set
