@@ -127,6 +127,7 @@ impl Watcher {
                     tally: Tally::default(),
                     reconnect: true,
                     follow_redirects: false,
+                    ..ReceiverConfig::default()
                 };
                 let Ok(rx) = Receiver::start(address, config, directory, false) else {
                     return;

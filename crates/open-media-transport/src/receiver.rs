@@ -42,7 +42,7 @@
 
 use std::io::{self, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -80,6 +80,14 @@ pub struct ReceiverConfig {
     pub reconnect: bool,
     /// Follow redirects (§9). libomtnet always does.
     pub follow_redirects: bool,
+    /// Upper bound on the bytes of decoded frames waiting to be handed to the
+    /// caller. A sender that outruns a slow reader would otherwise grow this
+    /// queue without limit (a remote out-of-memory: a 15 MB/s stream filled
+    /// 3 GB in 1.2 s in testing). Once the queue would exceed this, further
+    /// video/audio frames are dropped — live video keeps the newest, not a
+    /// backlog — and counted in [`ChannelStats::dropped`]. Control events
+    /// (connect, close, redirect) are never dropped. Default 64 MiB.
+    pub max_queued_bytes: usize,
 }
 
 impl Default for ReceiverConfig {
@@ -92,6 +100,7 @@ impl Default for ReceiverConfig {
             tally: Tally::default(),
             reconnect: true,
             follow_redirects: true,
+            max_queued_bytes: 64 * 1024 * 1024,
         }
     }
 }
@@ -127,6 +136,9 @@ pub struct ChannelStats {
     pub bytes: u64,
     /// Complete frames, protocol messages included.
     pub frames: u64,
+    /// Frames dropped because the queue was at `max_queued_bytes` (§ receiver
+    /// back-pressure). Non-zero means the caller is not draining fast enough.
+    pub dropped: u64,
 }
 
 /// Counters since the receiver started, for [`Receiver::stats`].
@@ -147,6 +159,7 @@ pub struct ReceiverStats {
 struct Counters {
     bytes: [AtomicU64; 2],
     frames: [AtomicU64; 2],
+    dropped: [AtomicU64; 2],
     reconnects: AtomicU64,
     redirects: AtomicU64,
 }
@@ -229,6 +242,9 @@ struct Inner {
     config: Mutex<ReceiverConfig>,
     conns: Mutex<Connections>,
     events: mpsc::Sender<Event>,
+    /// Bytes of `Event::Frame` payload currently queued in `events` but not yet
+    /// taken by the caller; bounded by `config.max_queued_bytes` in `read_loop`.
+    queued: Arc<AtomicUsize>,
     ctl: Mutex<Control>,
     wake: Condvar,
     me: Weak<Inner>,
@@ -287,6 +303,7 @@ impl Receiver {
             config: Mutex::new(config),
             conns: Mutex::new(Connections::default()),
             events: tx,
+            queued: Arc::default(),
             ctl: Mutex::new(Control::default()),
             wake: Condvar::new(),
             me: me.clone(),
@@ -318,7 +335,19 @@ impl Receiver {
 
     /// Waits up to `timeout` for the next event.
     pub fn recv_timeout(&self, timeout: Duration) -> Option<Event> {
-        self.events.recv_timeout(timeout).ok()
+        let event = self.events.recv_timeout(timeout).ok()?;
+        if let Event::Frame(_, f) = &event {
+            // Release the queue space this frame took (counted in `read_loop`).
+            self.inner.queued.fetch_sub(f.data.len(), Ordering::Relaxed);
+        }
+        Some(event)
+    }
+
+    /// Bytes of decoded frames queued but not yet taken by the caller. Stays at
+    /// or below `ReceiverConfig::max_queued_bytes`; useful in tests and to see
+    /// whether the caller is keeping up.
+    pub fn queued_bytes(&self) -> usize {
+        self.inner.queued.load(Ordering::Relaxed)
     }
 
     /// Sends a command to the sender, e.g. a tally or quality change. Tally,
@@ -373,6 +402,7 @@ impl Receiver {
         let channel = |i: usize| ChannelStats {
             bytes: c.bytes[i].load(Ordering::Relaxed),
             frames: c.frames[i].load(Ordering::Relaxed),
+            dropped: c.dropped[i].load(Ordering::Relaxed),
         };
         ReceiverStats {
             video: channel(0),
@@ -684,7 +714,13 @@ fn read_loop(
         Channel::Video => 0,
         Channel::Audio => 1,
     };
-    let Some(tx) = inner.upgrade().map(|i| i.events.clone()) else {
+    let Some((tx, queued, max_queued)) = inner.upgrade().map(|i| {
+        (
+            i.events.clone(),
+            i.queued.clone(),
+            i.config.lock().unwrap().max_queued_bytes,
+        )
+    }) else {
         return;
     };
     let mut deframer = Deframer::new(limits);
@@ -707,8 +743,17 @@ fn read_loop(
                         (ExtendedHeader::None, Message::Redirect(x)) => redirect::parse(x),
                         _ => None,
                     };
-                    if tx.send(Event::Frame(channel, f)).is_err() {
-                        break 'read None; // receiver dropped
+                    // Bound the queue: drop the frame rather than let a fast
+                    // sender grow the caller's backlog without limit. Control
+                    // events and the redirect below are unaffected.
+                    let size = f.data.len();
+                    if queued.load(Ordering::Relaxed).saturating_add(size) > max_queued {
+                        stats.dropped[slot].fetch_add(1, Ordering::Relaxed);
+                    } else {
+                        queued.fetch_add(size, Ordering::Relaxed);
+                        if tx.send(Event::Frame(channel, f)).is_err() {
+                            break 'read None; // receiver dropped
+                        }
                     }
                     if let (Some(a), Some(i)) = (heard, inner.upgrade()) {
                         i.redirect_heard(false, a);
@@ -998,5 +1043,63 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert_eq!(r.peer_addr().unwrap().port(), second.port());
+    }
+
+    #[test]
+    fn the_queue_is_bounded_when_the_caller_does_not_read() {
+        use crate::sender::{Sender, SenderConfig, VideoParams};
+        use vmx_codec::{Frame, PixelFormat};
+
+        let sender = Sender::new(SenderConfig {
+            announce: false,
+            ports: 17700..=17900,
+            ..SenderConfig::new("flood")
+        })
+        .unwrap();
+        let cap = 512 * 1024;
+        let cfg = ReceiverConfig {
+            audio: false,
+            reconnect: false,
+            max_queued_bytes: cap,
+            ..ReceiverConfig::default()
+        };
+        let r = Receiver::connect(format!("127.0.0.1:{}", sender.port()).parse().unwrap(), cfg)
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while sender.video_receivers() == 0 {
+            assert!(Instant::now() < deadline, "receiver never subscribed");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        // Flood: send many varied frames and never call r.recv_timeout(). The
+        // reader keeps draining the socket, so the only thing that could grow
+        // without limit is the event queue — which the cap must hold down.
+        let params = VideoParams {
+            frame_rate_n: 60,
+            frame_rate_d: 1,
+            aspect_ratio: 16.0 / 9.0,
+            color_space: 709,
+            premultiplied: false,
+        };
+        for n in 0..400u64 {
+            let mut frame = Frame::new(640, 360, PixelFormat::Uyvy);
+            // Vary the bytes so nothing dedupes and it does not all compress away.
+            for (i, b) in frame.planes[0].data.iter_mut().enumerate() {
+                *b = i.wrapping_add(n as usize) as u8;
+            }
+            let _ = sender.send_video(&frame, params, n as i64 * 1_000_000, b"");
+        }
+        // Let the reader drain the socket into the bounded queue.
+        std::thread::sleep(Duration::from_millis(500));
+
+        assert!(
+            r.queued_bytes() <= cap,
+            "queue {} bytes exceeded the {cap}-byte cap",
+            r.queued_bytes()
+        );
+        assert!(
+            r.stats().video.dropped > 0,
+            "expected frames to be dropped once the queue hit the cap"
+        );
     }
 }
