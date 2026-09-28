@@ -18,13 +18,18 @@ whatever the code suggests.
 | 2026-09-28 | sender (Mac, arm64) | our receiver (NUC, x86_64) | 0.1.0 (`48c3984`) | macOS 26.5.1 ↔ Linux Mint 22.3, wired LAN | **works**: 1280x720 30 fps, ~5.9 Mbit/s, 48 kHz stereo, 0 decode errors over 8 s; snapshot decoded correctly on x86_64 from an arm64 VMX1 stream | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §2 |
 | 2026-09-28 | receiver (Mac, arm64) | our sender (NUC, x86_64) | 0.1.0 (`48c3984`) | macOS 26.5.1 ↔ Linux Mint 22.3, wired LAN | **works**: 1280x720 30 fps, 0 decode errors; snapshot decoded correctly on arm64 from an x86_64 VMX1 stream | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §3 |
 | 2026-09-28 | receiver reconnect by name | our sender (NUC, x86_64), restarted | 0.1.0 (`48c3984`) | macOS 26.5.1 ↔ Linux Mint 22.3, wired LAN | **works**: Mac receiver lost the NUC sender, retried, re-resolved the name over mDNS and reconnected on its own, resuming at 30 fps with 0 decode errors | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §4 |
+| 2026-09-28 | receiver following a redirect | our redirecting sender (Mac) → real source (NUC) | 0.1.0 (`d5e74dd`) | macOS 26.5.1 ↔ Linux Mint 22.3, wired LAN | **works**: receiver read `OMTRedirect` from the portal on the Mac, re-resolved the target name and reconnected to the real source on the NUC, then decoded 640x360 30 fps with 0 errors | [`evidence/2026-09-28-redirect-discovery-server`](evidence/2026-09-28-redirect-discovery-server/README.md) §1 |
+| 2026-09-28 | discovery server + client, no mDNS | our sender (Mac) via server on NUC, receiver (NUC) via same server | 0.1.0 (`d5e74dd`) | macOS 26.5.1 ↔ Linux Mint 22.3, wired LAN | **works**: server on the NUC registered the Mac sender; `list` and `recv` with `--no-mdns` on both machines found it through the server alone and received 640x360 30 fps, 0 errors | [`evidence/2026-09-28-redirect-discovery-server`](evidence/2026-09-28-redirect-discovery-server/README.md) §2 |
 
 Rows dated 2026-09-28 are `omt`-to-`omt` between two machines — the first runs on
 a real network, on Linux, and on x86_64. They do not involve a third-party product.
 
 ## Not yet tested
 
-- Redirect between separate machines, the discovery server between separate machines.
-- vMix, OBS with the OMT plugin, SIENNA tools, the Raspberry Pi encoder/decoder.
+- vMix, OBS with the OMT plugin, SIENNA tools.
 - Windows (the v0.1.0 Windows binary was built by CI but never run), and Wi-Fi /
   cross-subnet networks (the 2026-09-28 tests were on a single wired subnet).
+- Redirect chains of more than one hop across separate machines (single-hop is
+  covered above).
+
+The Raspberry Pi encoder/decoder is out of scope: not being tested (Saul, 28 Sep 2026).
