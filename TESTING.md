@@ -54,6 +54,23 @@ omt list --seconds 10
 Expected: one line per OMT source, like `"MY-PC (Camera 1)"  my-pc.local:6400  [192.168.1.20]`.
 Compare with what your OMT product shows.
 
+### A0. Check a source's health (quickest first test)
+
+Point `omt check` at any source (a name from `omt list`, `omt://host:port`, or
+`host:port`). It watches for a few seconds and prints one verdict:
+
+```sh
+omt check "MY-PC (Camera 1)" --seconds 5
+```
+
+Expected on a good source: a line with the resolution, the frames per second
+actually arriving versus what the source claims, the audio, and `OK`. It prints
+`WARN` if the picture is black or frozen, the audio is silent, or the frame rate
+is well under what the source claims, and `FAIL` if nothing decodes. It exits
+`0` / `1` / `2` for OK / WARN / FAIL, and takes `--json` for a machine-readable
+report — handy in a script. If this says `WARN`/`FAIL`, note it and run the
+tests below to see where it breaks.
+
 ### B. Receive from a real product
 
 Start a source in your product (vMix output, OBS with the OMT plugin, SIENNA or vMix OMT
