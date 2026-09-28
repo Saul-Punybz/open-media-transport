@@ -19,6 +19,12 @@
 //! sources already known first: `mdns-sd` keeps a single listener per
 //! service type, so a second browse of its own would silence the first.
 //!
+//! On Windows, libomtnet removes every `.` from the instance name it
+//! registers over mDNS (D6, `win32/OMTDiscoveryWin32.cs:201`), so a name
+//! announced here on Windows loses its dots too, and [`Discovery::announce`]
+//! returns the name receivers will see. To a discovery server the full name
+//! is sent unchanged, as libomtnet does.
+//!
 //! A name can be announced once per [`Discovery`]: announcing it again is an
 //! error, so dropping one sender can never withdraw another's announcement.
 //! libomtnet ignores the second registration and withdraws the name when
@@ -271,7 +277,10 @@ impl Discovery {
     /// It stays announced until [`Discovery::withdraw`] or drop. A full name
     /// already announced here is an error.
     pub fn announce(&self, name: &str, port: u16) -> Result<String, Error> {
-        let full = full_name(&machine_name(), name);
+        let mut full = full_name(&machine_name(), name);
+        if self.server.is_none() && cfg!(windows) {
+            full = windows_instance_name(&full);
+        }
         let mut announced = self.announced.lock().unwrap();
         if let Some(p) = announced.get(&full) {
             return Err(Error::Msg(format!(
@@ -351,6 +360,11 @@ impl Discovery {
         *m = Some((fanout.clone(), h));
         Ok(fanout)
     }
+}
+
+/// D6: the instance name libomtnet registers on Windows, without dots.
+fn windows_instance_name(full_name: &str) -> String {
+    full_name.replace('.', "")
 }
 
 fn start_daemon(interfaces: &Interfaces) -> Result<ServiceDaemon, Error> {
@@ -544,6 +558,16 @@ mod tests {
             port,
             addresses: vec!["127.0.0.1".parse().unwrap()],
         }
+    }
+
+    #[test]
+    fn windows_names_lose_their_dots() {
+        // D6, `win32/OMTDiscoveryWin32.cs:201`.
+        assert_eq!(
+            windows_instance_name("MY.PC.LOCAL (Cam 1.5)"),
+            "MYPCLOCAL (Cam 15)"
+        );
+        assert_eq!(windows_instance_name("PC (Cam)"), "PC (Cam)");
     }
 
     #[test]

@@ -371,10 +371,14 @@ impl Sender {
         // What a redirect to ourselves looks like (X4): our full name, as
         // libomtnet compares (`OMTRedirect.cs:115-118`), and our URL (N4).
         let machine = discovery::machine_name();
-        let self_names = vec![
+        let mut self_names = vec![
             discovery::full_name(&machine, &config.name),
             format!("{}{machine}:{port}", crate::address::URL_PREFIX),
         ];
+        if cfg!(windows) {
+            // What receivers see over mDNS on Windows (D6).
+            self_names.push(self_names[0].replace('.', ""));
+        }
         let shared = Arc::new(Shared {
             redirect: Mutex::new(RedirectState::default()),
             self_names,
