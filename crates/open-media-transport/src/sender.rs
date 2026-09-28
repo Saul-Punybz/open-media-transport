@@ -1547,14 +1547,21 @@ mod tests {
         extra
             .set_read_timeout(Some(Duration::from_secs(2)))
             .unwrap();
+        // Closed shows as end of stream, or as a reset where the sender
+        // closed with our tally unread (Windows); a timeout means still open.
         let mut buf = [0u8; 4096];
-        let mut closed = false;
-        while let Ok(n) = io::Read::read(&mut extra, &mut buf) {
-            if n == 0 {
-                closed = true;
-                break;
+        let closed = loop {
+            match io::Read::read(&mut extra, &mut buf) {
+                Ok(0) => break true,
+                Ok(_) => continue,
+                Err(e) => {
+                    break matches!(
+                        e.kind(),
+                        io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted
+                    )
+                }
             }
-        }
+        };
         assert!(closed, "the connection over the per-IP limit was closed");
         // Room again once one leaves.
         drop(held);

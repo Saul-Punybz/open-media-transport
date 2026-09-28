@@ -1121,15 +1121,36 @@ mod tests {
 
     #[test]
     fn drop_is_bounded_while_connecting() {
-        // The sender went away; the supervisor keeps trying while we drop.
+        // The sender went away; the supervisor is in a connection attempt
+        // while we drop. The name moves to a documentation address (TEST-NET-1,
+        // RFC 5737) where the attempt hangs until its timeout. A freed local
+        // port would not do: another test's listener can get it, and this
+        // receiver would connect there.
+        use crate::discovery::{Source, SourceEvent};
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
+        let source = |ip: &str, port| {
+            SourceEvent::Resolved(Source {
+                full_name: "TEST (gone)".into(),
+                host: "test-omt.local.".into(),
+                port,
+                addresses: vec![ip.parse().unwrap()],
+            })
+        };
+        let dir = Arc::new(Directory::manual());
+        dir.apply(source("127.0.0.1", listener.local_addr().unwrap().port()));
         let cfg = ReceiverConfig {
             audio: false,
             ..ReceiverConfig::default()
         };
-        let r = Receiver::connect(addr, cfg).unwrap();
-        drop(listener);
+        let r = Receiver::connect_address(
+            Address::parse("TEST (gone)").unwrap(),
+            cfg,
+            Some(dir.clone()),
+        )
+        .unwrap();
+        let (held, _) = listener.accept().unwrap();
+        dir.apply(source("192.0.2.1", 9));
+        drop(held);
         std::thread::sleep(Duration::from_millis(1200));
         let start = Instant::now();
         drop(r);
