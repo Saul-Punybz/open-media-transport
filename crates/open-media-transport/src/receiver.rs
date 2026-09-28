@@ -80,6 +80,14 @@ pub struct ReceiverConfig {
     pub reconnect: bool,
     /// Follow redirects (§9). libomtnet always does.
     pub follow_redirects: bool,
+    /// Which redirect targets to follow (§ security). A sender's redirect can
+    /// name any address, including a public host or an arbitrary DNS name, so
+    /// a hostile sender could otherwise steer a receiver at a third party.
+    /// The default, [`RedirectPolicy::LocalOnly`], follows a redirect only to
+    /// loopback or a private / link-local address — the trusted LAN OMT lives
+    /// on — and refuses one that resolves anywhere global, falling back to the
+    /// original source. [`RedirectPolicy::Any`] restores libomtnet's behaviour.
+    pub redirect_policy: RedirectPolicy,
     /// Upper bound on the bytes of decoded frames waiting to be handed to the
     /// caller. A sender that outruns a slow reader would otherwise grow this
     /// queue without limit (a remote out-of-memory: a 15 MB/s stream filled
@@ -100,8 +108,43 @@ impl Default for ReceiverConfig {
             tally: Tally::default(),
             reconnect: true,
             follow_redirects: true,
+            redirect_policy: RedirectPolicy::LocalOnly,
             max_queued_bytes: 64 * 1024 * 1024,
         }
+    }
+}
+
+/// Which redirect targets a receiver will follow. See
+/// [`ReceiverConfig::redirect_policy`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RedirectPolicy {
+    /// Follow a redirect only when every address it resolves to is loopback or
+    /// private / link-local (a trusted LAN). Refuse it otherwise. Default.
+    LocalOnly,
+    /// Follow a redirect to any address, as libomtnet does.
+    Any,
+}
+
+/// Whether an address is loopback or on a private / link-local range — the kind
+/// of network OMT, a trusted-LAN protocol, is meant to run on. Uses only stable
+/// std APIs (IPv6 unique-local `fc00::/7` and link-local `fe80::/10` by prefix).
+fn is_local_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || v4.is_link_local(),
+        std::net::IpAddr::V6(v6) => {
+            let head = v6.segments()[0];
+            v6.is_loopback() || (head & 0xfe00) == 0xfc00 || (head & 0xffc0) == 0xfe80
+        }
+    }
+}
+
+/// Whether `policy` allows a redirect that resolved to `addrs`. `LocalOnly`
+/// requires every address to be local, so a resolver returning a mix of a LAN
+/// and a public address cannot slip the public one through.
+fn redirect_addrs_allowed(policy: RedirectPolicy, addrs: &[SocketAddr]) -> bool {
+    match policy {
+        RedirectPolicy::Any => true,
+        RedirectPolicy::LocalOnly => !addrs.is_empty() && addrs.iter().all(|a| is_local_ip(a.ip())),
     }
 }
 
@@ -493,12 +536,31 @@ impl Inner {
         }
     }
 
+    /// Drops a redirect the policy refused and returns to the original source,
+    /// telling the caller with `Event::Redirect(None)`. Not counted as a
+    /// followed redirect.
+    fn reject_redirect(&self) {
+        let mut c = self.ctl.lock().unwrap();
+        c.redirect = None;
+        c.following = false;
+        drop(c);
+        let _ = self.events.send(Event::Redirect(None));
+    }
+
     /// Opens every connection the config asks for, with its §4.3 sequence,
     /// at the current target.
     fn open_all(&self, wait: Option<Duration>) -> io::Result<()> {
-        let target = self.target();
-        let addrs = self.resolve(&target, wait)?;
+        let mut addrs = self.resolve(&self.target(), wait)?;
         let cfg = *self.config.lock().unwrap();
+        // Refuse a redirect that leaves the trusted LAN and fall back to the
+        // original source, so a hostile sender cannot steer us at a third party
+        // (§ security, RedirectPolicy).
+        if self.ctl.lock().unwrap().redirect.is_some()
+            && !redirect_addrs_allowed(cfg.redirect_policy, &addrs)
+        {
+            self.reject_redirect();
+            addrs = self.resolve(&self.target(), wait)?;
+        }
         let mut conns = Connections::default();
         // Like `Socket.BeginConnect(IPAddress[], port)` (`OMTReceive.cs:391`),
         // try each address in turn; the second connection goes to the one
@@ -1101,5 +1163,34 @@ mod tests {
             r.stats().video.dropped > 0,
             "expected frames to be dropped once the queue hit the cap"
         );
+    }
+
+    #[test]
+    fn redirect_policy_keeps_receivers_on_the_local_network() {
+        let local = [
+            "172.16.80.73:6400",
+            "192.168.1.5:6400",
+            "10.0.0.9:6400",
+            "127.0.0.1:6400",
+        ]
+        .map(|s| s.parse::<SocketAddr>().unwrap());
+        let global = ["203.0.113.1:6400", "8.8.8.8:6400"].map(|s| s.parse::<SocketAddr>().unwrap());
+
+        for a in local {
+            assert!(is_local_ip(a.ip()), "{a} should be local");
+            assert!(redirect_addrs_allowed(RedirectPolicy::LocalOnly, &[a]));
+        }
+        for a in global {
+            assert!(!is_local_ip(a.ip()), "{a} should be non-local");
+            assert!(!redirect_addrs_allowed(RedirectPolicy::LocalOnly, &[a]));
+            assert!(redirect_addrs_allowed(RedirectPolicy::Any, &[a]));
+        }
+        // A resolver mixing a LAN address with a public one is still refused,
+        // and an empty resolution has nothing to follow.
+        assert!(!redirect_addrs_allowed(
+            RedirectPolicy::LocalOnly,
+            &[local[0], global[0]]
+        ));
+        assert!(!redirect_addrs_allowed(RedirectPolicy::LocalOnly, &[]));
     }
 }
