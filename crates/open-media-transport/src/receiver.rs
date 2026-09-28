@@ -86,6 +86,9 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 /// libomtnet does not wait: its first attempt usually finds nothing and the
 /// next `Receive` call tries again.
 pub const RESOLVE_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a receiver still connected waits for a redirect's target to be
+/// discovered before deciding whether its policy refuses it.
+const REFUSAL_WAIT: Duration = Duration::from_secs(2);
 /// Video frames held for the application (`VIDEO_FRAME_POOL_COUNT`,
 /// `OMTConstants.cs:54`).
 pub const MAX_QUEUED_VIDEO: usize = 4;
@@ -628,17 +631,23 @@ impl Inner {
         }
     }
 
-    /// Whether the redirect being followed resolves now, without waiting,
-    /// only to addresses the policy refuses, so the receiver would stay where
-    /// it is. A target not found yet is not refused: connecting will tell.
+    /// Whether the redirect being followed resolves only to addresses the
+    /// policy refuses, so the receiver would stay where it is. A name is
+    /// waited for up to [`REFUSAL_WAIT`] while the current connections stay
+    /// up: a redirect usually arrives the moment a receiver connects, before
+    /// discovery has seen its target. A target still not found is not
+    /// refused: connecting will tell.
     fn refused_now(&self) -> bool {
+        let policy = self.config.lock().unwrap().redirects;
+        if policy == RedirectPolicy::Any {
+            return false;
+        }
         let Ok((target, true)) = self.target() else {
             return false;
         };
-        let Ok(addrs) = self.resolve(&target, None) else {
+        let Ok(addrs) = self.resolve(&target, Some(REFUSAL_WAIT)) else {
             return false;
         };
-        let policy = self.config.lock().unwrap().redirects;
         let origin = self.conns.lock().unwrap().origin;
         addrs.iter().all(|a| !policy.allows(origin, a.ip()))
     }
