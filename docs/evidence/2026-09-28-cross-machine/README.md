@@ -19,7 +19,9 @@ Same source commit on both. Release binaries:
 
 (Binaries differ by architecture, as expected; both from `48c3984`.)
 
-Wired LAN, same subnet `172.16.80.0/22`, no client isolation. macOS application
+Wi-Fi, both machines on the same network and subnet `172.16.80.0/22` (the NUC on
+`wlp58s0`, whose Ethernet port had no cable, and the Mac on `en0`; corrected 28 Sep 2026
+from "wired LAN", see `2026-09-28-fix-library-two-machines`), no client isolation. macOS application
 firewall off. Discovery is mDNS only: macOS uses its own `mDNSResponder`, the
 NUC uses `avahi-daemon 0.8`. No discovery server was used.
 
