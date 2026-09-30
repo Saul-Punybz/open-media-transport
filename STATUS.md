@@ -118,6 +118,14 @@ wake a blocked read, so readers poll a stop flag every 100 ms; evidence `docs/ev
 
 **In flight on 23 Sep (branches; worktrees under the session scratchpad — if lost, re-create from the
 pushed branches):**
+> **Update 30 Sep 2026:** those worktrees are gone, but their uncommitted work was saved as patches
+> in `~/Downloads/_Projects/_wip-omt-2026-09-23/` (README there says how to restore). Since then
+> `fix/library` was redone and merged (#8), `omt check` merged (#7), release-ci (#2), CLI (#4) and
+> cross-machine interop (#6) merged. Still only in the patches: `interop-coverage.patch` (harness
+> formats OBS/Pi send, multichannel audio, 1080p59.94, PROTOCOL Live rows) and the tester-kit extras
+> not in #7 (`omt report`, `check --all/--watch`, send/recv format flags, TESTING.md rewrite) in
+> `tester-kit.patch`. Caudal M12 output: `feat/m12-output` (pushed, needs rebase onto `feat/m12-omt`).
+
 - `fix/library` — bug-hunt + security fixes and small features. Bugs (each with a failing test in
   the bug-hunt report): shared `Discovery` second browse deafens the first (mdns-sd overwrites the
   listener); sender `start_peer` race leaks peers/tally on fast close; duplicate name on a shared
