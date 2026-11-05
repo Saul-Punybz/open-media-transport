@@ -5,6 +5,12 @@
 //! by exact byte equality of the whole payload (M3). The tally strings contain
 //! `Program==`, two equals signs, which is not well-formed XML and must be
 //! reproduced exactly (`OMTMetadata.cs:44-48`).
+//!
+//! Upstream corrected the tally strings to `Program="…"` and then reverted
+//! the change (libomtnet issue #51, pull requests #54 and #55), so an
+//! implementation that followed the correction may send that form. Here the
+//! corrected strings are recognised as tally commands too, byte for byte like
+//! the others; what is sent is always upstream's form.
 
 const SUBSCRIBE_VIDEO: &str = r#"<OMTSubscribe Video="true" />"#;
 const SUBSCRIBE_AUDIO: &str = r#"<OMTSubscribe Audio="true" />"#;
@@ -15,6 +21,37 @@ const TALLY_NONE: &str = r#"<OMTTally Preview="false" Program=="false" />"#;
 const TALLY_PREVIEW: &str = r#"<OMTTally Preview="true" Program=="false" />"#;
 const TALLY_PROGRAM: &str = r#"<OMTTally Preview="false" Program=="true" />"#;
 const TALLY_BOTH: &str = r#"<OMTTally Preview="true" Program=="true" />"#;
+/// The corrected tally strings of libomtnet #54, accepted but never sent.
+const TALLY_CORRECTED: [(&str, Tally); 4] = [
+    (
+        r#"<OMTTally Preview="false" Program="false" />"#,
+        Tally {
+            preview: false,
+            program: false,
+        },
+    ),
+    (
+        r#"<OMTTally Preview="true" Program="false" />"#,
+        Tally {
+            preview: true,
+            program: false,
+        },
+    ),
+    (
+        r#"<OMTTally Preview="false" Program="true" />"#,
+        Tally {
+            preview: false,
+            program: true,
+        },
+    ),
+    (
+        r#"<OMTTally Preview="true" Program="true" />"#,
+        Tally {
+            preview: true,
+            program: true,
+        },
+    ),
+];
 const QUALITY_DEFAULT: &str = r#"<OMTSettings Quality="Default" />"#;
 const QUALITY_LOW: &str = r#"<OMTSettings Quality="Low" />"#;
 const QUALITY_MEDIUM: &str = r#"<OMTSettings Quality="Medium" />"#;
@@ -109,9 +146,19 @@ impl Command {
     }
 
     /// Recognises a metadata payload that is exactly one of the fixed
-    /// strings. A trailing NUL or any other difference means it is not (M3).
+    /// strings, or one of the corrected tally strings (see the module
+    /// documentation). A trailing NUL or any other difference means it is
+    /// not (M3).
     pub fn recognize(payload: &[u8]) -> Option<Command> {
-        ALL.iter().copied().find(|c| c.as_bytes() == payload)
+        ALL.iter()
+            .copied()
+            .find(|c| c.as_bytes() == payload)
+            .or_else(|| {
+                TALLY_CORRECTED
+                    .iter()
+                    .find(|(s, _)| s.as_bytes() == payload)
+                    .map(|(_, t)| Command::Tally(*t))
+            })
     }
 }
 
@@ -261,16 +308,28 @@ mod tests {
 
     #[test]
     fn near_misses_are_not_commands() {
-        // M3: a trailing NUL, whitespace, or well-formed tally XML is not a command.
+        // M3: a trailing NUL or other whitespace is not a command.
         let mut with_nul = Command::SubscribeVideo.as_bytes().to_vec();
         with_nul.push(0);
         assert_eq!(Command::recognize(&with_nul), None);
         assert_eq!(Command::recognize(br#"<OMTSubscribe Video="true"/>"#), None);
         assert_eq!(
-            Command::recognize(br#"<OMTTally Preview="true" Program="false" />"#),
+            Command::recognize(br#"<OMTTally Preview="true" Program="false"/>"#),
             None
         );
         assert_eq!(classify(&with_nul), Message::Application(&with_nul));
+    }
+
+    #[test]
+    fn corrected_tally_is_recognised_but_never_sent() {
+        // libomtnet #54 (reverted in #55) wrote `Program="…"`.
+        for (s, t) in TALLY_CORRECTED {
+            assert_eq!(Command::recognize(s.as_bytes()), Some(Command::Tally(t)));
+            assert!(Command::Tally(t)
+                .as_bytes()
+                .windows(9)
+                .any(|w| w == b"Program=="));
+        }
     }
 
     #[test]

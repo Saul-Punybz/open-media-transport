@@ -247,6 +247,18 @@ impl SenderConfig {
             max_connections_per_ip: DEFAULT_MAX_CONNECTIONS_PER_IP,
         }
     }
+
+    /// [`SenderConfig::new`] with the port range and discovery server of
+    /// libomtnet's `settings.xml` ([`crate::settings`]), as every libomtnet
+    /// sender uses (`OMTSend.cs:100-101`, `OMTDiscovery.cs:56-60`).
+    pub fn from_settings(name: impl Into<String>) -> Self {
+        let s = crate::settings::Settings::load();
+        SenderConfig {
+            ports: s.ports(),
+            discovery_server: s.discovery_server,
+            ..SenderConfig::new(name)
+        }
+    }
 }
 
 /// Video frame properties that travel in the header (§3.3).
@@ -371,10 +383,14 @@ impl Sender {
         // What a redirect to ourselves looks like (X4): our full name, as
         // libomtnet compares (`OMTRedirect.cs:115-118`), and our URL (N4).
         let machine = discovery::machine_name();
-        let self_names = vec![
+        let mut self_names = vec![
             discovery::full_name(&machine, &config.name),
             format!("{}{machine}:{port}", crate::address::URL_PREFIX),
         ];
+        if cfg!(windows) {
+            // What receivers see over mDNS on Windows (D6).
+            self_names.push(self_names[0].replace('.', ""));
+        }
         let shared = Arc::new(Shared {
             redirect: Mutex::new(RedirectState::default()),
             self_names,

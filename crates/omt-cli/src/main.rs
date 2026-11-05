@@ -35,6 +35,7 @@ use open_media_transport::media::{
 };
 use open_media_transport::receiver::{Event, Receiver, ReceiverConfig, RedirectPolicy};
 use open_media_transport::sender::{Sender, SenderConfig, SenderInfo, VideoParams};
+use open_media_transport::settings::Settings;
 use vmx_codec::{Frame, PixelFormat};
 
 const USAGE: &str = "\
@@ -70,6 +71,10 @@ USAGE:
       6399), printing each client and source as it comes and goes.
   omt version
   omt help
+
+  Like libomtnet applications, omt reads libomtnet's settings.xml
+  (~/.OMT/settings.xml, %ProgramData%\\OMT\\settings.xml on Windows, or in
+  $OMT_STORAGE_PATH): its DiscoveryServer, NetworkPortStart and NetworkPortEnd.
 
   list, send and recv also take --discovery-server omt://HOST[:PORT]: send
   then registers with that server instead of announcing over mDNS; list and
@@ -160,14 +165,21 @@ fn seconds(args: &[String]) -> Result<Option<u64>> {
 
 /// mDNS, or the discovery server given with `--discovery-server`.
 fn discovery(args: &[String]) -> Result<Discovery> {
-    match opt(args, "--discovery-server") {
+    match discovery_server(args) {
         Some(url) => {
             let mdns = !args.iter().any(|a| a == "--no-mdns");
-            Discovery::with_server(url, mdns)
+            Discovery::with_server(&url, mdns)
         }
         None => Discovery::new(),
     }
     .map_err(|e| e.to_string())
+}
+
+/// `--discovery-server`, or else the one in libomtnet's `settings.xml`.
+fn discovery_server(args: &[String]) -> Option<String> {
+    opt(args, "--discovery-server")
+        .map(str::to_owned)
+        .or_else(|| Settings::load().discovery_server)
 }
 
 fn list(args: &[String]) -> Result<()> {
@@ -257,8 +269,9 @@ fn send(args: &[String]) -> Result<()> {
         None => 1,
     };
 
-    let mut config = SenderConfig::new(name);
-    config.discovery_server = opt(args, "--discovery-server").map(str::to_owned);
+    // Ports and discovery server from settings.xml, as a libomtnet sender.
+    let mut config = SenderConfig::from_settings(name);
+    config.discovery_server = discovery_server(args);
     config.encoder_threads = threads;
     config.info = Some(SenderInfo {
         product_name: "omt".into(),
