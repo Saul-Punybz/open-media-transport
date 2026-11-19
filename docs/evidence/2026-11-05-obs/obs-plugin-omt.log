@@ -1,0 +1,169 @@
+11/5/2026 3:51:50 PM,[OMTOutput],ConfigFilename: ~/Library/Application Support/obs-studio/plugin_config/omtplugin/omtplugin.json
+11/5/2026 3:51:50 PM,[OMTOutput],CreatedConfigPath: ~/Library/Application Support/obs-studio/plugin_config/omtplugin
+11/5/2026 3:51:52 PM,[OBSOutput],Loaded config file
+11/5/2026 3:51:52 PM,[OMTOutput],UpdateSettings
+11/5/2026 3:51:52 PM,[OBSOutput],Saved config file
+11/5/2026 3:51:52 PM,[OMTSource],Created: 5199958424
+11/5/2026 3:53:58 PM,[OMTSource],Created: 5199958416
+11/5/2026 3:54:58 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:54:58 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:54:58 PM,[OMTSource],VideoProc.Started
+11/5/2026 3:54:58 PM,[OMTSource],New Receiver: omt://127.0.0.1:6400,UYVYorBGRA
+11/5/2026 3:54:58 PM,[OMTReceive.Connect],Connected.Video: omt://127.0.0.1:6400
+11/5/2026 3:54:58 PM,[OMTSource],ColorFormatRetrieved: VIDEO_CS_DEFAULT
+11/5/2026 3:54:58 PM,[OMTReceive.Connect],Connected.Audio: omt://127.0.0.1:6400
+11/5/2026 3:55:26 PM,[OMTOutput],ShowSettings
+11/5/2026 3:55:26 PM,[OMTOutput],GetProperties
+11/5/2026 3:55:27 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:27 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:27 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:27 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:28 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:28 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:28 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:28 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:29 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:29 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:29 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:29 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:30 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:30 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:30 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:30 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:31 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:31 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:31 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:31 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:32 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:32 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:32 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:32 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:33 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:33 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:33 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:33 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:34 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:34 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:34 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:34 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:35 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:35 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:35 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:35 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:36 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:36 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:36 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:36 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:37 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:37 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:37 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:37 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:55:38 PM,[OMTOutput],UpdateSettings
+11/5/2026 3:55:38 PM,[OBSOutput],Saved config file
+11/5/2026 3:55:38 PM,[OMTOutput],Create: Data: 5199958184 Source: 35187327008
+11/5/2026 3:55:38 PM,[OMTOutput],CreateMainOutput: omtoutput,35187327008
+11/5/2026 3:55:38 PM,[OMTOutput],StartOutput: 35187327008
+11/5/2026 3:55:38 PM,[OMTOutput],OMTOutputFormat: 1280x720 30 fps VIDEO_FORMAT_NV12
+11/5/2026 3:55:38 PM,[OMTOutput],StartInstance: 35187327008
+11/5/2026 3:55:38 PM,[OMTReceive.BeginConnect],ConnectingVideo: 127.0.0.1 (6400):6400
+11/5/2026 3:55:38 PM,[OMTReceive.BeginConnect],ConnectingAudio: 127.0.0.1 (6400):6400
+11/5/2026 3:55:38 PM,[OMTReceive.Connect],Connected.Video: omt://127.0.0.1:6400
+11/5/2026 3:55:38 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:59936
+11/5/2026 3:55:38 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:127.0.0.1]:59937
+11/5/2026 3:55:38 PM,[OMTReceive.Connect],Connected.Audio: omt://127.0.0.1:6400
+11/5/2026 3:56:21 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:59948
+11/5/2026 3:56:21 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:59949
+11/5/2026 3:56:27 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:56:27 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:56:27 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:59953
+11/5/2026 3:56:27 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:59954
+11/5/2026 3:56:35 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:56:35 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:56:44 PM,[OMTSource],ThreadExited
+11/5/2026 3:56:44 PM,[OMTSource],VideoProc.Stopped
+11/5/2026 3:56:44 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:56:44 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:56:44 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:56:44 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:56:44 PM,[OMTSource],ColorFormatRetrieved: VIDEO_CS_DEFAULT
+11/5/2026 3:56:44 PM,[OMTSource],VideoProc.Started
+11/5/2026 3:56:44 PM,[OMTSource],New Receiver: MAC.LAN (OBSTest),UYVYorBGRA
+11/5/2026 3:56:44 PM,[OMTReceive.Connect],Connected.Video: MAC.LAN (OBSTest)
+11/5/2026 3:56:44 PM,[OMTReceive.Connect],Connected.Audio: MAC.LAN (OBSTest)
+11/5/2026 3:56:52 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:59966
+11/5/2026 3:56:52 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:59967
+11/5/2026 3:56:58 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:56:58 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:56:58 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:59972
+11/5/2026 3:56:58 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:59973
+11/5/2026 3:57:04 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:57:04 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:57:21 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:21 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:21 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:21 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:22 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:22 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:22 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:22 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:23 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:23 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:23 PM,[OMTReceive.Connect],Connected.Video: MAC.LAN (OBSTest)
+11/5/2026 3:57:23 PM,[OMTReceive.Connect],Connected.Audio: MAC.LAN (OBSTest)
+11/5/2026 3:57:35 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:60015
+11/5/2026 3:57:35 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:60016
+11/5/2026 3:57:39 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:57:39 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:57:39 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:39 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:39 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:39 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:40 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:40 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:40 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:40 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:41 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:41 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:41 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:41 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:57:42 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:42 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:57:42 PM,[OMTReceive.Connect],Connected.Video: MAC.LAN (OBSTest)
+11/5/2026 3:57:42 PM,[OMTReceive.Connect],Connected.Audio: MAC.LAN (OBSTest)
+11/5/2026 3:57:54 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:60053
+11/5/2026 3:57:54 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:60054
+11/5/2026 3:58:00 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:58:00 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:58:00 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:58:00 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:58:01 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:58:01 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:58:01 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:58:01 PM,[OMTReceive.Connect],Connection refused
+11/5/2026 3:58:13 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:58:13 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:58:14 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:60077
+11/5/2026 3:58:14 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:60078
+11/5/2026 3:58:16 PM,[OMTReceive.BeginConnect],ConnectingVideo: MAC.LAN (OBSTest):6401
+11/5/2026 3:58:16 PM,[OMTReceive.BeginConnect],ConnectingAudio: MAC.LAN (OBSTest):6401
+11/5/2026 3:58:16 PM,[OMTReceive.Connect],Connected.Video: MAC.LAN (OBSTest)
+11/5/2026 3:58:16 PM,[OMTReceive.Connect],Connected.Audio: MAC.LAN (OBSTest)
+11/5/2026 3:58:18 PM,[OMTOutput],ShowSettings
+11/5/2026 3:58:18 PM,[OMTOutput],GetProperties
+11/5/2026 3:58:27 PM,[OMTOutput],UpdateSettings
+11/5/2026 3:58:27 PM,[OBSOutput],Saved config file
+11/5/2026 3:58:27 PM,[OMTOutput],StopOutput: 35187327008
+11/5/2026 3:58:27 PM,[OMTOutput],DestroyMainOutput
+11/5/2026 3:58:34 PM,[OMTOutput],ShowSettings
+11/5/2026 3:58:34 PM,[OMTOutput],GetProperties
+11/5/2026 3:58:42 PM,[OMTOutput],UpdateSettings
+11/5/2026 3:58:42 PM,[OBSOutput],Saved config file
+11/5/2026 3:58:42 PM,[OMTOutput],Create: Data: 5199958024 Source: 35187327008
+11/5/2026 3:58:42 PM,[OMTOutput],CreateMainOutput: omtoutput,35187327008
+11/5/2026 3:58:42 PM,[OMTOutput],StartOutput: 35187327008
+11/5/2026 3:58:42 PM,[OMTOutput],OMTOutputFormat: 1280x720 30 fps VIDEO_FORMAT_NV12
+11/5/2026 3:58:42 PM,[OMTOutput],StartInstance: 35187327008
+11/5/2026 3:58:43 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:60093
+11/5/2026 3:58:43 PM,[OMTSend.BeginAccept],AddConnection: [::ffff:192.168.12.117]:60094
+11/5/2026 3:58:59 PM,[OMTSend.RemoveChannel],RemoveConnection
+11/5/2026 3:58:59 PM,[OMTSend.RemoveChannel],RemoveConnection

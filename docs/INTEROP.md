@@ -18,13 +18,18 @@ whatever the code suggests.
 | 2026-09-28 | sender (Mac, arm64) | our receiver (NUC, x86_64) | 0.1.0 (`48c3984`) | macOS 26.5.1 ↔ Linux Mint 22.3, Wi-Fi | **works**: 1280x720 30 fps, ~5.9 Mbit/s, 48 kHz stereo, 0 decode errors over 8 s; snapshot decoded correctly on x86_64 from an arm64 VMX1 stream | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §2 |
 | 2026-09-28 | receiver (Mac, arm64) | our sender (NUC, x86_64) | 0.1.0 (`48c3984`) | macOS 26.5.1 ↔ Linux Mint 22.3, Wi-Fi | **works**: 1280x720 30 fps, 0 decode errors; snapshot decoded correctly on arm64 from an x86_64 VMX1 stream | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §3 |
 | 2026-09-28 | receiver reconnect by name | our sender (NUC, x86_64), restarted | 0.1.0 (`48c3984`) | macOS 26.5.1 ↔ Linux Mint 22.3, Wi-Fi | **works**: Mac receiver lost the NUC sender, retried, re-resolved the name over mDNS and reconnected on its own, resuming at 30 fps with 0 decode errors | [`evidence/2026-09-28-cross-machine`](evidence/2026-09-28-cross-machine/README.md) §4 |
+| 2026-11-05 | sender (`omt send`, `ec11ec2`): by URL, by name, 10-bit, restart | **OBS Studio** OMT Source | OBS 33.0.1, omtplugin 1.0.0.19 | macOS 26.5.1, one host | **works**: picture correct and moving, discovered by name, OBS reconnected by itself. OBS's 8-bit, 30 fps canvas does not show 10-bit or 60 fps being kept. | [`evidence/2026-11-05-obs`](evidence/2026-11-05-obs/README.md) |
+| 2026-11-05 | receiver (`omt recv`, `omt check`, `ec11ec2`), by name; reconnect | **OBS Studio** OMT Output | OBS 33.0.1, omtplugin 1.0.0.19 | macOS 26.5.1, one host | **works**: 1280x720 30 fps, 0 decode errors, picture correct, reconnected after the output was turned off and on. | [`evidence/2026-11-05-obs`](evidence/2026-11-05-obs/README.md) |
 
 Rows dated 2026-09-28 are `omt`-to-`omt` between two machines — the first runs on
 a real network, on Linux, and on x86_64. They do not involve a third-party product.
+Rows dated 2026-11-05 are the first against a shipping product, OBS, on one Mac. The plugin embeds
+libomtnet, and no traffic crossed a network.
 
 ## Not yet tested
 
 - Redirect between separate machines, the discovery server between separate machines.
-- vMix, OBS with the OMT plugin, SIENNA tools, the Raspberry Pi encoder/decoder.
+- vMix, SIENNA tools, the Raspberry Pi encoder/decoder.
+- OBS on another machine, on Windows or on Linux; OBS tally, HDR and 10-bit output.
 - Windows (the v0.1.0 Windows binary was built by CI but never run), wired networks,
   and cross-subnet networks (the 2026-09-28 tests were on one Wi-Fi subnet).

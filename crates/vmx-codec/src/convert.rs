@@ -184,10 +184,10 @@ pub(crate) fn planes8_to_frame(pl: &Planes<u8>, l: &Layout, interlaced: bool, f:
             }
             PixelFormat::Yuv422p | PixelFormat::Yuva422p => {
                 let n = if fmt == PixelFormat::Yuva422p { 4 } else { 3 };
-                for p in 0..n {
+                for (p, plane) in f.planes.iter_mut().enumerate().take(n) {
                     let len = if p == 1 || p == 2 { cw } else { w };
-                    let s = f.planes[p].stride;
-                    f.planes[p].data[ir * s..ir * s + len].copy_from_slice(pl.row(p, r, len));
+                    let s = plane.stride;
+                    plane.data[ir * s..ir * s + len].copy_from_slice(pl.row(p, r, len));
                 }
             }
             _ => unreachable!("not an 8-bit decode format"),

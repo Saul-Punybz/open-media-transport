@@ -1,0 +1,15 @@
+sending "MAC.LAN (OBSTest)" on port 6401 — 1920x1080 at 30.00 fps. Ctrl-C to stop.
+   5.0s  connections=0 video_receivers=0 tally= dropped=0
+  10.0s  connections=0 video_receivers=0 tally= dropped=0
+  15.1s  connections=0 video_receivers=0 tally= dropped=0
+  20.1s  connections=0 video_receivers=0 tally= dropped=0
+  25.1s  connections=0 video_receivers=0 tally= dropped=0
+  30.1s  connections=0 video_receivers=0 tally= dropped=0
+  35.1s  connections=0 video_receivers=0 tally= dropped=0
+  40.1s  connections=2 video_receivers=1 tally= dropped=0
+  45.1s  connections=2 video_receivers=1 tally= dropped=0
+  50.2s  connections=2 video_receivers=1 tally= dropped=0
+  55.2s  connections=2 video_receivers=1 tally= dropped=0
+  60.2s  connections=2 video_receivers=1 tally= dropped=0
+  65.2s  connections=2 video_receivers=1 tally= dropped=0
+  70.2s  connections=2 video_receivers=1 tally= dropped=0
