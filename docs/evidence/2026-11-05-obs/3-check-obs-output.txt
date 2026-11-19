@@ -1,0 +1,4 @@
+checking MAC.LAN (OBS Output) for 6s…
+  video: 1280x720, 30.0 fps received (source says 30.00), 0 decode error(s)
+  audio: 48000 Hz 2 ch, peak level 0.1780
+OK

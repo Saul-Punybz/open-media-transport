@@ -1,0 +1,55 @@
+connecting to MAC.LAN (OBS Output)
+connected (Video channel) to 192.168.12.117:6400
+connected (Audio channel) to 192.168.12.117:6400
+sender says: Tally(Tally { preview: false, program: false })
+sender says: Tally(Tally { preview: false, program: false })
+   1.0s  video 1280x720 30.00 fps | 30.6 fps received | 10.3 Mbit/s | audio 48000 Hz 2 ch, 0/47 frames with sound | decode errors 0
+   2.0s  video 1280x720 30.00 fps | 30.0 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+   3.0s  video 1280x720 30.00 fps | 29.9 fps received | 10.4 Mbit/s | audio 48000 Hz 2 ch, 5/48 frames with sound | decode errors 0
+   4.0s  video 1280x720 30.00 fps | 30.0 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 5/47 frames with sound | decode errors 0
+   5.0s  video 1280x720 30.00 fps | 29.9 fps received | 10.4 Mbit/s | audio 48000 Hz 2 ch, 5/47 frames with sound | decode errors 0
+   6.0s  video 1280x720 30.00 fps | 30.0 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+   7.0s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+   8.0s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+   9.0s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+  10.0s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+  11.0s  video 1280x720 30.00 fps | 30.8 fps received | 10.7 Mbit/s | audio 48000 Hz 2 ch, 5/47 frames with sound | decode errors 0
+  12.0s  video 1280x720 30.00 fps | 30.0 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 5/46 frames with sound | decode errors 0
+disconnected (Video channel): Some(Io(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" })) — retrying
+disconnected (Audio channel): Some(Io(Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" })) — retrying
+  13.0s  video 1280x720 30.00 fps | 26.0 fps received | 9.0 Mbit/s | audio 48000 Hz 2 ch, 4/43 frames with sound | decode errors 0
+  14.1s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  15.1s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  16.2s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  17.2s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  18.2s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  19.3s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  20.3s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  21.4s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  22.4s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  23.4s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  24.5s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  25.5s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  26.5s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  27.6s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+  28.6s  video 1280x720 30.00 fps | 0.0 fps received | 0.0 Mbit/s | audio 48000 Hz 2 ch, 0/0 frames with sound | decode errors 0
+connected (Video channel) to 192.168.12.117:6400
+connected (Audio channel) to 192.168.12.117:6400
+sender says: Tally(Tally { preview: false, program: false })
+sender says: Tally(Tally { preview: false, program: false })
+  29.6s  video 1280x720 30.00 fps | 18.9 fps received | 6.4 Mbit/s | audio 48000 Hz 2 ch, 0/29 frames with sound | decode errors 0
+  30.6s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+  31.6s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+  32.6s  video 1280x720 30.00 fps | 30.4 fps received | 10.6 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+  33.7s  video 1280x720 30.00 fps | 29.8 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/48 frames with sound | decode errors 0
+  34.7s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+  35.7s  video 1280x720 30.00 fps | 29.9 fps received | 10.4 Mbit/s | audio 48000 Hz 2 ch, 5/47 frames with sound | decode errors 0
+  36.7s  video 1280x720 30.00 fps | 30.0 fps received | 10.4 Mbit/s | audio 48000 Hz 2 ch, 5/47 frames with sound | decode errors 0
+  37.7s  video 1280x720 30.00 fps | 30.0 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 5/47 frames with sound | decode errors 0
+  38.7s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+  39.7s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+  40.7s  video 1280x720 30.00 fps | 29.9 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 6/47 frames with sound | decode errors 0
+  41.7s  video 1280x720 30.00 fps | 30.8 fps received | 10.8 Mbit/s | audio 48000 Hz 2 ch, 6/46 frames with sound | decode errors 0
+  42.7s  video 1280x720 30.00 fps | 29.5 fps received | 10.3 Mbit/s | audio 48000 Hz 2 ch, 6/49 frames with sound | decode errors 0
+  43.7s  video 1280x720 30.00 fps | 30.0 fps received | 10.5 Mbit/s | audio 48000 Hz 2 ch, 5/47 frames with sound | decode errors 0
+  44.7s  video 1280x720 30.00 fps | 29.8 fps received | 10.4 Mbit/s | audio 48000 Hz 2 ch, 5/47 frames with sound | decode errors 0
